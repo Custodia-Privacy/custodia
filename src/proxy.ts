@@ -8,23 +8,46 @@ import type { NextRequest } from "next/server";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes — no auth required
-  const publicPaths = ["/", "/pricing", "/login", "/signup", "/api/banner", "/api/webhooks", "/api/auth", "/api/trpc"];
-  const isPublic = publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const publicPaths = [
+    "/",
+    "/pricing",
+    "/login",
+    "/signup",
+    "/api/banner",
+    "/api/webhooks",
+    "/api/auth",
+    "/api/trpc",
+    "/api/public",
+  ];
+  const isPublic =
+    publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
+    pathname.startsWith("/request/") ||
+    pathname.startsWith("/preference-center/");
 
   if (isPublic) {
     return NextResponse.next();
   }
 
-  // Dashboard routes — require authentication
-  const protectedPaths = ["/dashboard", "/sites", "/settings"];
+  const protectedPaths = [
+    "/dashboard",
+    "/sites",
+    "/settings",
+    "/dsars",
+    "/assessments",
+    "/data-map",
+    "/vendors",
+    "/preferences",
+    "/agents",
+    "/assistant",
+  ];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtected) {
-    // Check for NextAuth session cookie
     const sessionToken =
       request.cookies.get("__Secure-next-auth.session-token") ??
-      request.cookies.get("next-auth.session-token");
+      request.cookies.get("next-auth.session-token") ??
+      request.cookies.get("authjs.session-token") ??
+      request.cookies.get("__Secure-authjs.session-token");
 
     if (!sessionToken) {
       const loginUrl = new URL("/login", request.url);

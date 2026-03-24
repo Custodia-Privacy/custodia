@@ -6,13 +6,16 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { db } from "@/lib/db";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia" as any,
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2025-02-24.acacia" as any,
+  });
+}
 
 const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.STRIPE_STARTER_PRICE_ID ?? ""]: "starter",
-  [process.env.STRIPE_PRO_PRICE_ID ?? ""]: "pro",
+  [process.env.STRIPE_GROWTH_PRICE_ID ?? ""]: "growth",
+  [process.env.STRIPE_BUSINESS_PRICE_ID ?? ""]: "business",
 };
 
 export async function POST(req: Request) {
@@ -25,6 +28,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
+    const stripe = getStripe();
     event = stripe.webhooks.constructEvent(
       body,
       signature,

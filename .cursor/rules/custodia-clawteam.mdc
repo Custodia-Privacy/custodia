@@ -1,0 +1,33 @@
+---
+description: When to use ClawTeam swarms vs single-agent Cursor work for Custodia
+globs: swarm-company/custodia/**
+alwaysApply: false
+---
+
+# Custodia + ClawTeam
+
+Custodia targets **production-ready** privacy automation for **SMB / small enterprise**. Large changes should sometimes use **ClawTeam** (`clawteam` CLI, `~/.clawteam/`, `swarm-company/scripts/swarm-orchestrator.sh`) for parallel, task-board–driven work.
+
+## Use ClawTeam when
+
+- **Multi-surface features**: e.g. dashboard + API + docs + E2E together.
+- **Parallel tracks**: research vs implementation vs review (separate agents).
+- **Long-running audits**: “scan entire dashboard wiring,” “gap analysis vs GDPR/CCPA checklist.”
+- **Heavy exploration** before coding (unknown file count > ~15 touched).
+
+## Prefer single Cursor agent when
+
+- **Tight loops**: one router + one page + verify.
+- **Bugfixes** with a clear file target.
+- **User asked for a small, explicit diff.**
+
+## Always (with or without ClawTeam)
+
+- Read real sources before changing behavior (routes, Prisma, tRPC context).
+- Keep **org-scoped** data behind `orgProcedure` and session `orgId`.
+- Document **public** surfaces (banner script, future DSAR/forms) in `docs/`.
+
+## Repo pointers
+
+- Swarm scripts: `swarm-company/scripts/swarm-orchestrator.sh`, `collect-report.sh`, `run-weekly-review.sh`
+- Product direction: `docs/PRODUCT-ROADMAP-SMB.md`

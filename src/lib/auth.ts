@@ -50,11 +50,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     authorized({ auth: session, request: { nextUrl } }) {
       const isLoggedIn = !!session?.user;
-      const isDashboard =
-        nextUrl.pathname.startsWith("/dashboard") ||
-        nextUrl.pathname.startsWith("/sites") ||
-        nextUrl.pathname.startsWith("/settings");
-      if (isDashboard) return isLoggedIn;
+      // Keep in sync with `src/proxy.ts` protectedPaths
+      const protectedPrefixes = [
+        "/dashboard",
+        "/sites",
+        "/settings",
+        "/dsars",
+        "/assessments",
+        "/data-map",
+        "/vendors",
+        "/preferences",
+        "/agents",
+        "/assistant",
+      ];
+      const isProtected = protectedPrefixes.some((p) => nextUrl.pathname.startsWith(p));
+      if (isProtected) return isLoggedIn;
       return true;
     },
     async jwt({ token, user, trigger }) {

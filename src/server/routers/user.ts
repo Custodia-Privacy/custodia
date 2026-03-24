@@ -4,7 +4,9 @@ import { createRouter, protectedProcedure } from "../trpc";
 import { Resend } from "resend";
 import { slugify } from "@/lib/utils";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 export const userRouter = createRouter({
   /** Get the current authenticated user with their org */
@@ -16,6 +18,7 @@ export const userRouter = createRouter({
         email: true,
         name: true,
         image: true,
+        notificationSettings: true,
         createdAt: true,
         memberships: {
           include: {
@@ -53,6 +56,35 @@ export const userRouter = createRouter({
         where: { id: ctx.userId },
         data: input,
         select: { id: true, email: true, name: true, image: true },
+      });
+    }),
+
+  /** Update email notification toggles (stored on the user row as JSON) */
+  updateNotificationSettings: protectedProcedure
+    .input(
+      z.object({
+        weeklyScanReports: z.boolean().optional(),
+        newTrackerAlerts: z.boolean().optional(),
+        dsarDeadlines: z.boolean().optional(),
+        policyUpdates: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.user.findUnique({
+        where: { id: ctx.userId },
+        select: { notificationSettings: true },
+      });
+      const prev =
+        existing?.notificationSettings &&
+        typeof existing.notificationSettings === "object" &&
+        !Array.isArray(existing.notificationSettings)
+          ? (existing.notificationSettings as Record<string, boolean>)
+          : {};
+      const next = { ...prev, ...input };
+      return ctx.db.user.update({
+        where: { id: ctx.userId },
+        data: { notificationSettings: next },
+        select: { id: true, notificationSettings: true },
       });
     }),
 
@@ -124,7 +156,7 @@ export const userRouter = createRouter({
       // Send invite email
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
       try {
-        await resend.emails.send({
+        await getResend().emails.send({
           from: "Custodia <noreply@custodia-privacy.com>",
           to: input.email,
           subject: `You've been invited to ${org.name} on Custodia`,
@@ -195,5 +227,99 @@ export const userRouter = createRouter({
       });
 
       return org;
+    }),
+
+  /** Remove a member from the org (not yourself). Owner: anyone except last owner. Admin: members only. */
+  removeTeamMember: protectedProcedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const caller = await ctx.db.orgMember.findFirst({
+        where: { userId: ctx.userId },
+      });
+      if (!caller) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No organization found" });
+      }
+
+      const target = await ctx.db.orgMember.findUnique({
+        where: { orgId_userId: { orgId: caller.orgId, userId: input.userId } },
+      });
+      if (!target) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+      if (target.userId === ctx.userId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot remove yourself from the organization here.",
+        });
+      }
+
+      if (caller.role === "member") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only owners and admins can remove members",
+        });
+      }
+      if (caller.role === "admin" && (target.role === "owner" || target.role === "admin")) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admins cannot remove owners or other admins",
+        });
+      }
+
+      if (target.role === "owner") {
+        const ownerCount = await ctx.db.orgMember.count({
+          where: { orgId: caller.orgId, role: "owner" },
+        });
+        if (ownerCount <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot remove the last owner",
+          });
+        }
+      }
+
+      await ctx.db.orgMember.delete({ where: { id: target.id } });
+      return { ok: true as const };
+    }),
+
+  /** Change role for a non-owner member (owner only). */
+  updateTeamMemberRole: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string().uuid(),
+        role: z.enum(["admin", "member"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const caller = await ctx.db.orgMember.findFirst({
+        where: { userId: ctx.userId },
+      });
+      if (!caller || caller.role !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can change roles",
+        });
+      }
+
+      const target = await ctx.db.orgMember.findUnique({
+        where: { orgId_userId: { orgId: caller.orgId, userId: input.userId } },
+      });
+      if (!target) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+      if (target.role === "owner") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Use a future transfer-ownership flow to change owners",
+        });
+      }
+
+      return ctx.db.orgMember.update({
+        where: { id: target.id },
+        data: { role: input.role },
+        include: {
+          user: { select: { id: true, email: true, name: true } },
+        },
+      });
     }),
 });

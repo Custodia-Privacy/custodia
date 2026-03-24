@@ -26,7 +26,7 @@ export const policyRouter = createRouter({
       if (!planLimits.policy) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Privacy policy generation requires a Starter or Pro plan.",
+          message: "Privacy policy generation requires a Starter, Growth, or Business plan.",
         });
       }
 

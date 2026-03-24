@@ -1,0 +1,156 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { db } from "@/lib/db";
+import { computeDsarDueDate } from "@/lib/dsar-deadlines";
+import { checkPublicRateLimit } from "@/lib/public-rate-limit";
+import { Resend } from "resend";
+
+const REQUEST_LABELS: Record<string, string> = {
+  access: "Access",
+  deletion: "Deletion",
+  rectification: "Rectification",
+  portability: "Portability",
+  opt_out: "Opt-out / Do not sell",
+  restrict_processing: "Restrict processing",
+};
+
+const bodySchema = z.object({
+  siteId: z.string().uuid(),
+  requestType: z.enum([
+    "access",
+    "deletion",
+    "rectification",
+    "portability",
+    "opt_out",
+    "restrict_processing",
+  ]),
+  jurisdiction: z.string().min(2).max(20),
+  requesterName: z.string().min(1).max(255),
+  requesterEmail: z.string().email(),
+  requesterPhone: z.string().max(50).optional(),
+  details: z.string().max(8000).optional(),
+  /** Honeypot — must be empty */
+  website: z.string().max(200).optional(),
+});
+
+function clientIp(req: Request): string {
+  const xf = req.headers.get("x-forwarded-for");
+  if (xf) return xf.split(",")[0]?.trim() || "unknown";
+  return req.headers.get("x-real-ip") || "unknown";
+}
+
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
+
+export async function POST(req: Request) {
+  const ip = clientIp(req);
+  const limited = checkPublicRateLimit(`dsar:${ip}`, 15, 60 * 60 * 1000);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "rate_limited", retryAfterSec: limited.retryAfterSec },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limited.retryAfterSec) },
+      },
+    );
+  }
+
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+
+  const parsed = bodySchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "validation_error", issues: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const input = parsed.data;
+  if (input.website && input.website.trim().length > 0) {
+    return NextResponse.json({ ok: true }, { status: 201 });
+  }
+
+  const site = await db.site.findFirst({
+    where: { id: input.siteId, deletedAt: null },
+    select: { id: true, orgId: true, domain: true },
+  });
+
+  if (!site) {
+    return NextResponse.json({ error: "site_not_found" }, { status: 404 });
+  }
+
+  const jurisdiction = input.jurisdiction.trim().toLowerCase();
+  const now = new Date();
+  const dueDate = computeDsarDueDate(jurisdiction, now);
+
+  const dsar = await db.$transaction(async (tx) => {
+    const row = await tx.dsarRequest.create({
+      data: {
+        orgId: site.orgId,
+        siteId: site.id,
+        requestType: input.requestType,
+        jurisdiction,
+        requesterName: input.requesterName.trim(),
+        requesterEmail: input.requesterEmail.trim().toLowerCase(),
+        requesterPhone: input.requesterPhone?.trim() || null,
+        dueDate,
+        receivedAt: now,
+        notes: input.details?.trim() || null,
+      },
+    });
+    await tx.dsarActivity.create({
+      data: {
+        requestId: row.id,
+        action: "request_received",
+        details: {
+          source: "public_form",
+          requestType: input.requestType,
+          jurisdiction,
+          dueDate: dueDate.toISOString(),
+        },
+        actor: "public_dsar_form",
+      },
+    });
+    return row;
+  });
+
+  const owner = await db.orgMember.findFirst({
+    where: { orgId: site.orgId, role: "owner" },
+    include: { user: { select: { email: true, name: true } } },
+  });
+
+  if (owner?.user?.email && process.env.RESEND_API_KEY) {
+    try {
+      await getResend().emails.send({
+        from: "Custodia <noreply@custodia-privacy.com>",
+        to: owner.user.email,
+        subject: `New privacy request (${REQUEST_LABELS[input.requestType]}) — ${site.domain}`,
+        html: `
+          <p>A new data subject request was submitted via your public form.</p>
+          <ul>
+            <li><strong>Type:</strong> ${REQUEST_LABELS[input.requestType]}</li>
+            <li><strong>Site:</strong> ${site.domain}</li>
+            <li><strong>Jurisdiction:</strong> ${jurisdiction}</li>
+            <li><strong>Due:</strong> ${dueDate.toISOString().slice(0, 10)}</li>
+            <li><strong>Requester:</strong> ${input.requesterName} &lt;${input.requesterEmail}&gt;</li>
+          </ul>
+          <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/dsars">Open DSARs in Custodia</a></p>
+        `,
+      });
+    } catch (e) {
+      console.error("[public/dsar] Resend failed", e);
+    }
+  }
+
+  return NextResponse.json(
+    {
+      ok: true,
+      reference: dsar.id,
+      message: "We received your request. The organization will respond within the legal timeframe.",
+    },
+    { status: 201 },
+  );
+}

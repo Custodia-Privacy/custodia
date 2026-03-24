@@ -4,6 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { deliverPrivacyWebhook } from "@/lib/privacy-webhook";
 
 // Basic jurisdiction detection from country code
 const GDPR_COUNTRIES = new Set([
@@ -42,7 +43,7 @@ export async function POST(
 
     const jurisdiction = detectJurisdiction(country);
 
-    await db.consentLog.create({
+    const log = await db.consentLog.create({
       data: {
         siteId,
         visitorId,
@@ -53,6 +54,36 @@ export async function POST(
         userAgent: userAgent?.substring(0, 500) ?? null,
       },
     });
+
+    const site = await db.site.findUnique({
+      where: { id: siteId },
+      select: {
+        orgId: true,
+        domain: true,
+        privacyWebhookUrl: true,
+        privacyWebhookSecret: true,
+      },
+    });
+    if (site?.privacyWebhookUrl && site.privacyWebhookSecret) {
+      void deliverPrivacyWebhook({
+        url: site.privacyWebhookUrl,
+        secret: site.privacyWebhookSecret,
+        event: "consent.recorded",
+        payload: {
+          event: "consent.recorded",
+          timestamp: new Date().toISOString(),
+          orgId: site.orgId,
+          siteId,
+          siteDomain: site.domain,
+          consentLogId: log.id,
+          visitorId,
+          consent,
+          action,
+          jurisdiction,
+          ipCountry: country?.substring(0, 2) ?? null,
+        },
+      });
+    }
 
     return NextResponse.json({ ok: true }, {
       headers: {

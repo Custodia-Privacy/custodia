@@ -1,0 +1,274 @@
+/**
+ * Policy Generator Agent — generates or updates privacy policies
+ * based on scan findings and regulatory requirements.
+ */
+import type { PrismaClient } from "@prisma/client";
+import { BaseAgent } from "./base";
+
+interface PolicyInput {
+  siteId: string;
+}
+
+interface ComplianceNote {
+  regulation: string;
+  status: "covered" | "partial" | "missing";
+  details: string;
+}
+
+interface PolicyOutput {
+  siteId: string;
+  domain: string;
+  policyMarkdown: string;
+  policyHtml: string;
+  complianceNotes: ComplianceNote[];
+  version: number;
+  basedOnScanId: string | null;
+}
+
+export class PolicyAgent extends BaseAgent {
+  constructor(orgId: string, runId: string, db: PrismaClient) {
+    super(orgId, runId, db);
+  }
+
+  async execute(input: Record<string, unknown>): Promise<void> {
+    const { siteId } = input as unknown as PolicyInput;
+    if (!siteId) {
+      await this.fail("Missing required input: siteId");
+      return;
+    }
+
+    await this.updateStatus("running");
+    await this.log("info", `Policy generator started for site ${siteId}`);
+
+    const site = await this.db.site.findFirst({
+      where: { id: siteId, orgId: this.orgId, deletedAt: null },
+      include: {
+        org: { select: { name: true } },
+        policy: { select: { id: true, version: true, contentMarkdown: true } },
+      },
+    });
+
+    if (!site) {
+      await this.fail(`Site ${siteId} not found for this organization`);
+      return;
+    }
+
+    const latestScan = await this.db.scan.findFirst({
+      where: { siteId, status: "completed" },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        summary: true,
+        rawData: true,
+        complianceScores: true,
+        createdAt: true,
+      },
+    });
+
+    if (!latestScan) {
+      await this.fail(`No completed scan found for ${site.domain}. Run a scan first.`);
+      return;
+    }
+
+    await this.log("info", `Using scan from ${latestScan.createdAt.toISOString().split("T")[0]}`);
+
+    const findings = await this.db.finding.findMany({
+      where: { scanId: latestScan.id },
+      select: {
+        category: true,
+        severity: true,
+        title: true,
+        description: true,
+        details: true,
+        regulations: true,
+      },
+    });
+
+    await this.log("info", `Analyzing ${findings.length} findings from scan`);
+
+    const policyMarkdown = await this.generatePolicy(site, latestScan, findings);
+    await this.log("info", "Privacy policy generated");
+
+    const complianceNotes = await this.checkCompliance(policyMarkdown, findings);
+    await this.log("info", `Compliance check complete: ${complianceNotes.filter((n) => n.status === "covered").length}/${complianceNotes.length} regulations fully covered`);
+
+    const policyHtml = this.markdownToHtml(policyMarkdown);
+
+    const newVersion = (site.policy?.version ?? 0) + 1;
+
+    if (site.policy) {
+      await this.db.policy.update({
+        where: { id: site.policy.id },
+        data: {
+          contentMarkdown: policyMarkdown,
+          contentHtml: policyHtml,
+          version: newVersion,
+          basedOnScanId: latestScan.id,
+          generatedAt: new Date(),
+        },
+      });
+    } else {
+      await this.db.policy.create({
+        data: {
+          siteId,
+          contentMarkdown: policyMarkdown,
+          contentHtml: policyHtml,
+          version: newVersion,
+          basedOnScanId: latestScan.id,
+          generatedAt: new Date(),
+        },
+      });
+    }
+
+    await this.log("info", `Policy v${newVersion} saved for ${site.domain}`);
+
+    const output: PolicyOutput = {
+      siteId,
+      domain: site.domain,
+      policyMarkdown,
+      policyHtml,
+      complianceNotes,
+      version: newVersion,
+      basedOnScanId: latestScan.id,
+    };
+
+    await this.complete(output as unknown as Record<string, unknown>);
+  }
+
+  private async generatePolicy(
+    site: { domain: string; org: { name: string } },
+    scan: { summary: unknown; rawData: unknown },
+    findings: Array<{
+      category: string;
+      severity: string;
+      title: string;
+      description: string;
+      details: unknown;
+      regulations: string[];
+    }>,
+  ): Promise<string> {
+    const rawData = scan.rawData as Record<string, unknown> | null;
+    const cookies = findings.filter((f) => f.category === "cookie");
+    const trackers = findings.filter((f) => f.category === "tracker");
+    const dataCollection = findings.filter((f) => f.category === "data_collection");
+    const scripts = findings.filter((f) => f.category === "script");
+
+    const text = await this.callClaude({
+      system: `You are a privacy policy expert inside Custodia, an AI-native privacy compliance platform. Generate a comprehensive, legally sound privacy policy in Markdown format.
+
+The policy MUST:
+- Be specific to the actual data practices detected on the site (no generic filler)
+- Cover all applicable regulations (GDPR, CCPA/CPRA, VCDPA, CTDPA, CPA)
+- Include all required disclosures for each regulation
+- Use clear, readable language (not dense legalese)
+- Include proper section structure with Markdown headings
+- Use [ORGANIZATION_NAME], [CONTACT_EMAIL], [DPO_NAME] as placeholders for org-specific info
+- Include an "Effective Date" and "Last Updated" placeholder
+
+Output the full privacy policy in Markdown. Nothing else.`,
+      prompt: `Generate a privacy policy for ${site.domain} (operated by ${site.org.name}).
+
+DETECTED DATA PRACTICES:
+
+Cookies (${cookies.length}):
+${cookies.map((c) => `- ${c.title}: ${c.description}`).join("\n") || "- No non-essential cookies detected"}
+
+Trackers (${trackers.length}):
+${trackers.map((t) => `- ${t.title}: ${t.description}`).join("\n") || "- No third-party trackers detected"}
+
+Data Collection (${dataCollection.length}):
+${dataCollection.map((d) => `- ${d.title}: ${d.description}`).join("\n") || "- No personal data collection forms detected"}
+
+Third-Party Scripts (${scripts.length}):
+${scripts.map((s) => `- ${s.title}: ${s.description}`).join("\n") || "- No notable third-party scripts"}
+
+Site Stats:
+- Total cookies: ${rawData?.totalCookies ?? "Unknown"}
+- Total trackers: ${rawData?.totalTrackers ?? "Unknown"}
+- Has cookie consent: ${rawData?.hasCookieConsent ?? "Unknown"}
+- Has Do Not Sell link: ${rawData?.hasDoNotSellLink ?? "Unknown"}
+- Personal data types: ${(rawData?.personalDataTypes as string[])?.join(", ") ?? "Unknown"}
+
+Generate the policy to accurately reflect these practices. Include sections for:
+1. Information We Collect
+2. How We Use Your Information
+3. Cookies and Tracking Technologies
+4. Third-Party Services
+5. Your Privacy Rights (GDPR, CCPA, state laws)
+6. Data Retention
+7. Data Security
+8. Children's Privacy
+9. International Data Transfers
+10. Changes to This Policy
+11. Contact Us`,
+      maxTokens: 6000,
+    });
+
+    return text;
+  }
+
+  private async checkCompliance(
+    policy: string,
+    findings: Array<{ regulations: string[] }>,
+  ): Promise<ComplianceNote[]> {
+    const applicableRegulations = [...new Set(findings.flatMap((f) => f.regulations))];
+    if (applicableRegulations.length === 0) {
+      applicableRegulations.push("gdpr", "ccpa");
+    }
+
+    const text = await this.callClaude({
+      system: `You are a privacy regulation compliance checker inside Custodia. Analyze a privacy policy against specific regulations and identify gaps.
+
+Respond with JSON only — an array:
+[{"regulation":"string","status":"covered|partial|missing","details":"string explaining what is/isn't covered"}]`,
+      prompt: `Check this privacy policy against these regulations: ${applicableRegulations.join(", ")}
+
+POLICY:
+${policy}
+
+For each regulation, check:
+- GDPR: Legal basis, data subject rights (access, rectification, erasure, portability, restriction, objection), DPO contact, cross-border transfers, cookie consent disclosure, data retention periods
+- CCPA/CPRA: Right to know, right to delete, right to opt-out, right to non-discrimination, "Do Not Sell" disclosure, data categories, business purposes, financial incentives
+- VCDPA: Consumer rights, data protection assessments, opt-out mechanisms, sensitive data consent
+- CTDPA: Similar to VCDPA with Connecticut-specific requirements
+- CPA: Colorado-specific consumer rights, universal opt-out mechanism`,
+      maxTokens: 2000,
+    });
+
+    try {
+      return this.parseJSON<ComplianceNote[]>(text);
+    } catch {
+      return applicableRegulations.map((reg) => ({
+        regulation: reg,
+        status: "partial" as const,
+        details: "Automated compliance check could not parse results. Manual review recommended.",
+      }));
+    }
+  }
+
+  private markdownToHtml(markdown: string): string {
+    let html = markdown;
+
+    html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>");
+    html = html.replace(/^## (.+)$/gm, "<h2>$1</h2>");
+    html = html.replace(/^# (.+)$/gm, "<h1>$1</h1>");
+    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    html = html.replace(/^- (.+)$/gm, "<li>$1</li>");
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, "<ul>$&</ul>");
+    html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
+
+    const paragraphs = html.split(/\n\n+/);
+    html = paragraphs
+      .map((p) => {
+        const trimmed = p.trim();
+        if (!trimmed) return "";
+        if (/^<(h[1-3]|ul|li)/.test(trimmed)) return trimmed;
+        return `<p>${trimmed}</p>`;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    return html;
+  }
+}

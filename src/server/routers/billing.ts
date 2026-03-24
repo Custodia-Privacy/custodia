@@ -4,9 +4,11 @@ import Stripe from "stripe";
 import { createRouter, protectedProcedure } from "../trpc";
 import { PLANS } from "@/lib/stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia" as any,
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2025-02-24.acacia" as any,
+  });
+}
 
 export const billingRouter = createRouter({
   /** Get current subscription details */
@@ -23,7 +25,7 @@ export const billingRouter = createRouter({
     let stripeSubscription: Stripe.Subscription | null = null;
     if (org.stripeSubscriptionId) {
       try {
-        stripeSubscription = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
+        stripeSubscription = await getStripe().subscriptions.retrieve(org.stripeSubscriptionId);
       } catch {
         // Subscription may have been deleted
       }
@@ -42,7 +44,7 @@ export const billingRouter = createRouter({
 
   /** Create a Stripe Checkout session for upgrading */
   createCheckout: protectedProcedure
-    .input(z.object({ plan: z.enum(["starter", "pro"]) }))
+    .input(z.object({ plan: z.enum(["starter", "growth", "business"]) }))
     .mutation(async ({ ctx, input }) => {
       const membership = await ctx.db.orgMember.findFirst({
         where: { userId: ctx.userId },
@@ -72,7 +74,7 @@ export const billingRouter = createRouter({
       // Create or retrieve Stripe customer
       let customerId = org.stripeCustomerId;
       if (!customerId) {
-        const customer = await stripe.customers.create({
+        const customer = await getStripe().customers.create({
           email: ctx.session.user.email ?? undefined,
           name: org.name,
           metadata: { orgId: org.id },
@@ -85,7 +87,7 @@ export const billingRouter = createRouter({
       }
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-      const session = await stripe.checkout.sessions.create({
+      const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         mode: "subscription",
         line_items: [{ price: priceId, quantity: 1 }],
@@ -111,7 +113,7 @@ export const billingRouter = createRouter({
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: membership.org.stripeCustomerId,
       return_url: `${appUrl}/settings`,
     });

@@ -1,16 +1,14 @@
 import type { ReactNode } from "react";
-import { Sidebar } from "@/components/dashboard/sidebar";
+import type { Metadata } from "next";
+import { DashboardAppShell } from "@/components/dashboard/dashboard-app-shell";
+
+export const metadata: Metadata = {
+  title: "App — Custodia",
+};
 
 /**
- * Dashboard layout — authenticated app shell with sidebar navigation.
+ * Dashboard layout — authenticated app shell with sidebar + live user/org from DB.
  */
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900">
-        {children}
-      </main>
-    </div>
-  );
+  return <DashboardAppShell>{children}</DashboardAppShell>;
 }

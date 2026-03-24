@@ -16,22 +16,29 @@ model User {
   passwordHash    String?   @map("password_hash") @db.VarChar(255)
   emailVerifiedAt DateTime? @map("email_verified_at")
   image           String?
+  /// In-app email notification toggles: { weeklyScanReports, newTrackerAlerts, dsarDeadlines, policyUpdates }
+  notificationSettings Json? @map("notification_settings")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   memberships OrgMember[]
   accounts    Account[]
   sessions    Session[]
+  auditLogs   AuditLog[]
+
+  /// PIAs assigned to this user for review / ownership
+  assignedAssessments  Assessment[]         @relation("AssessmentAssignee")
+  assessmentActivities AssessmentActivity[]
 
   @@map("users")
 }
 
 model Account {
-  id                String @id @default(uuid()) @db.Uuid
-  userId            String @map("user_id") @db.Uuid
-  type              String @db.VarChar(50)
-  provider          String @db.VarChar(50)
-  providerAccountId String @map("provider_account_id") @db.VarChar(255)
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
+  type              String  @db.VarChar(50)
+  provider          String  @db.VarChar(50)
+  providerAccountId String  @map("provider_account_id") @db.VarChar(255)
   refreshToken      String? @map("refresh_token")
   accessToken       String? @map("access_token")
   expiresAt         Int?    @map("expires_at")
@@ -70,7 +77,8 @@ model VerificationToken {
 enum Plan {
   free
   starter
-  pro
+  growth
+  business
 }
 
 enum OrgRole {
@@ -89,11 +97,39 @@ model Organization {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
-  members OrgMember[]
-  sites   Site[]
-  alerts  Alert[]
+  members           OrgMember[]
+  sites             Site[]
+  alerts            Alert[]
+  dsarRequests      DsarRequest[]
+  assessments       Assessment[]
+  dataStores        DataStore[]
+  dataFlows         DataFlow[]
+  vendors           Vendor[]
+  preferenceCenters PreferenceCenter[]
+  agentRuns         AgentRun[]
+  apiKeys           ApiKey[]
+  auditLogs         AuditLog[]
 
   @@map("organizations")
+}
+
+/// Org-scoped audit trail (assistant confirmations, future admin actions).
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  action       String   @db.VarChar(100)
+  source       String   @default("assistant") @db.VarChar(50)
+  payload      Json?
+  success      Boolean  @default(true)
+  errorMessage String?  @map("error_message") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("audit_logs")
 }
 
 model OrgMember {
@@ -108,6 +144,25 @@ model OrgMember {
 
   @@unique([orgId, userId])
   @@map("org_members")
+}
+
+// ─── API Keys (for MCP server & agent auth) ─────────────────────────────────
+
+model ApiKey {
+  id        String    @id @default(uuid()) @db.Uuid
+  orgId     String    @map("org_id") @db.Uuid
+  name      String    @db.VarChar(255)
+  keyHash   String    @unique @map("key_hash") @db.VarChar(255)
+  prefix    String    @db.VarChar(10)
+  scopes    String[]
+  lastUsed  DateTime? @map("last_used")
+  expiresAt DateTime? @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
 }
 
 // ─── Sites & Scanning ────────────────────────────────────────────────────────
@@ -132,13 +187,19 @@ model Site {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  scans       Scan[]
-  findings    Finding[]
-  banner      Banner?
-  policy      Policy?
-  consentLogs ConsentLog[]
-  alerts      Alert[]
+  /// Optional HTTPS URL for consent/banner events (HMAC-signed POST JSON).
+  privacyWebhookUrl    String? @map("privacy_webhook_url") @db.VarChar(2048)
+  privacyWebhookSecret String? @map("privacy_webhook_secret") @db.VarChar(255)
+
+  org              Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  scans            Scan[]
+  findings         Finding[]
+  banner           Banner?
+  policy           Policy?
+  consentLogs      ConsentLog[]
+  alerts           Alert[]
+  dsarRequests     DsarRequest[]
+  preferenceCenters PreferenceCenter[]
 
   @@unique([orgId, domain])
   @@map("sites")
@@ -275,7 +336,7 @@ model Policy {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  site        Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site        Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   basedOnScan Scan? @relation(fields: [basedOnScanId], references: [id])
 
   @@map("policies")
@@ -288,11 +349,14 @@ enum AlertType {
   compliance_drop
   scan_failed
   policy_outdated
+  dsar_deadline
+  pia_required
+  vendor_risk
 }
 
 model Alert {
   id        String    @id @default(uuid()) @db.Uuid
-  siteId    String    @map("site_id") @db.Uuid
+  siteId    String?   @map("site_id") @db.Uuid
   orgId     String    @map("org_id") @db.Uuid
   type      AlertType
   title     String    @db.VarChar(500)
@@ -301,9 +365,350 @@ model Alert {
   readAt    DateTime? @map("read_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
-  site Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site Site?        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId, readAt])
   @@map("alerts")
+}
+
+// ─── DSAR Management ─────────────────────────────────────────────────────────
+
+enum DsarType {
+  access
+  deletion
+  rectification
+  portability
+  opt_out
+  restrict_processing
+}
+
+enum DsarStatus {
+  received
+  identity_verified
+  processing
+  data_collected
+  review
+  fulfilled
+  rejected
+  appealed
+}
+
+model DsarRequest {
+  id              String     @id @default(uuid()) @db.Uuid
+  orgId           String     @map("org_id") @db.Uuid
+  siteId          String?    @map("site_id") @db.Uuid
+  requestType     DsarType   @map("request_type")
+  status          DsarStatus @default(received)
+  jurisdiction    String     @db.VarChar(20)
+
+  // Requester info
+  requesterName   String     @map("requester_name") @db.VarChar(255)
+  requesterEmail  String     @map("requester_email") @db.VarChar(255)
+  requesterPhone  String?    @map("requester_phone") @db.VarChar(50)
+  verificationId  String?    @map("verification_id")
+
+  // Deadlines
+  receivedAt      DateTime   @default(now()) @map("received_at")
+  dueDate         DateTime   @map("due_date")
+  extensionDays   Int        @default(0) @map("extension_days")
+
+  // AI processing
+  aiSummary       String?    @map("ai_summary") @db.Text
+  dataLocations   Json?      @map("data_locations")
+  responsePackage Json?      @map("response_package")
+
+  // Audit trail
+  notes           String?    @db.Text
+  fulfilledAt     DateTime?  @map("fulfilled_at")
+  rejectedReason  String?    @map("rejected_reason") @db.Text
+
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  org        Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  site       Site?          @relation(fields: [siteId], references: [id])
+  activities DsarActivity[]
+
+  @@index([orgId, status])
+  @@index([orgId, dueDate])
+  @@map("dsar_requests")
+}
+
+model DsarActivity {
+  id        String   @id @default(uuid()) @db.Uuid
+  requestId String   @map("request_id") @db.Uuid
+  action    String   @db.VarChar(100)
+  details   Json?
+  actor     String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  request DsarRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("dsar_activities")
+}
+
+// ─── Privacy Impact Assessments ──────────────────────────────────────────────
+
+enum AssessmentStatus {
+  draft
+  in_progress
+  ai_review
+  human_review
+  approved
+  rejected
+  archived
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+  critical
+}
+
+model Assessment {
+  id           String           @id @default(uuid()) @db.Uuid
+  orgId        String           @map("org_id") @db.Uuid
+  title        String           @db.VarChar(500)
+  description  String?          @db.Text
+  projectType  String           @map("project_type") @db.VarChar(100)
+  status       AssessmentStatus @default(draft)
+  riskLevel    RiskLevel?       @map("risk_level")
+
+  // AI-powered assessment
+  questions    Json?
+  answers      Json?
+  riskAnalysis Json?            @map("risk_analysis")
+  aiReport     String?          @map("ai_report") @db.Text
+  mitigations  Json?
+
+  // Review
+  reviewedBy   String?          @map("reviewed_by") @db.VarChar(255)
+  reviewNotes  String?          @map("review_notes") @db.Text
+  approvedAt   DateTime?        @map("approved_at")
+
+  assignedToUserId String? @map("assigned_to_user_id") @db.Uuid
+
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  org        Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  assignedTo User?                @relation("AssessmentAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  activities AssessmentActivity[]
+
+  @@index([orgId, status])
+  @@index([assignedToUserId])
+  @@map("assessments")
+}
+
+/// Append-only trail for PIA lifecycle (assignment, AI steps, review).
+model AssessmentActivity {
+  id           String   @id @default(uuid()) @db.Uuid
+  assessmentId String   @map("assessment_id") @db.Uuid
+  action       String   @db.VarChar(100)
+  details      Json?
+  actorUserId  String?  @map("actor_user_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  actor      User?      @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([assessmentId, createdAt(sort: Desc)])
+  @@map("assessment_activities")
+}
+
+// ─── Data Governance ─────────────────────────────────────────────────────────
+
+enum DataStoreType {
+  database
+  api
+  file_storage
+  saas_app
+  crm
+  analytics
+  email_platform
+  cdn
+  payment_processor
+  other
+}
+
+enum DataSensitivity {
+  public
+  internal
+  confidential
+  restricted
+  pii
+  sensitive_pii
+}
+
+model DataStore {
+  id              String         @id @default(uuid()) @db.Uuid
+  orgId           String         @map("org_id") @db.Uuid
+  name            String         @db.VarChar(255)
+  type            DataStoreType
+  provider        String?        @db.VarChar(100)
+  location        String?        @db.VarChar(100)
+  description     String?        @db.Text
+
+  // Data classification (AI-generated)
+  dataTypes       Json?          @map("data_types")
+  sensitivity     DataSensitivity @default(internal)
+  piiFields       Json?          @map("pii_fields")
+  recordCount     Int?           @map("record_count")
+
+  // Connection (for DSAR agent data discovery)
+  connectionType  String?        @map("connection_type") @db.VarChar(50)
+  connectionConfig Json?         @map("connection_config")
+  lastSyncedAt    DateTime?      @map("last_synced_at")
+
+  status          String         @default("active") @db.VarChar(20)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceFlows  DataFlow[]   @relation("sourceFlows")
+  targetFlows  DataFlow[]   @relation("targetFlows")
+
+  @@index([orgId, type])
+  @@map("data_stores")
+}
+
+model DataFlow {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  sourceId     String   @map("source_id") @db.Uuid
+  targetId     String   @map("target_id") @db.Uuid
+
+  dataTypes    Json?    @map("data_types")
+  purpose      String?  @db.VarChar(500)
+  legalBasis   String?  @map("legal_basis") @db.VarChar(100)
+  crossBorder  Boolean  @default(false) @map("cross_border")
+
+  discoveredBy String?  @map("discovered_by") @db.VarChar(50)
+  confidence   Float?
+  verified     Boolean  @default(false)
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  source DataStore    @relation("sourceFlows", fields: [sourceId], references: [id], onDelete: Cascade)
+  target DataStore    @relation("targetFlows", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId])
+  @@map("data_flows")
+}
+
+model Vendor {
+  id               String    @id @default(uuid()) @db.Uuid
+  orgId            String    @map("org_id") @db.Uuid
+  name             String    @db.VarChar(255)
+  category         String    @db.VarChar(100)
+  website          String?   @db.VarChar(500)
+  dpaUrl           String?   @map("dpa_url") @db.VarChar(500)
+  privacyPolicyUrl String?   @map("privacy_policy_url") @db.VarChar(500)
+  subProcessors    Json?     @map("sub_processors")
+
+  dataShared       Json?     @map("data_shared")
+  purposes         Json?
+  legalBasis       String?   @map("legal_basis") @db.VarChar(100)
+
+  riskLevel        RiskLevel?  @map("risk_level")
+  complianceStatus String?   @map("compliance_status") @db.VarChar(50)
+  lastReviewedAt   DateTime? @map("last_reviewed_at")
+
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, category])
+  @@map("vendors")
+}
+
+// ─── Preference Management ───────────────────────────────────────────────────
+
+model PreferenceCenter {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  siteId          String?   @map("site_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  config          Json      @default("{}")
+  publishedConfig Json?     @map("published_config")
+  publishedAt     DateTime? @map("published_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  /// Optional HTTPS URL for preference subscription updates (HMAC-signed POST JSON).
+  privacyWebhookUrl    String? @map("privacy_webhook_url") @db.VarChar(2048)
+  privacyWebhookSecret String? @map("privacy_webhook_secret") @db.VarChar(255)
+
+  org         Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  site        Site?            @relation(fields: [siteId], references: [id])
+  preferences UserPreference[]
+
+  @@map("preference_centers")
+}
+
+model UserPreference {
+  id          String   @id @default(uuid()) @db.Uuid
+  centerId    String   @map("center_id") @db.Uuid
+  externalId  String?  @map("external_id") @db.VarChar(255)
+  email       String?  @db.VarChar(255)
+  preferences Json
+  source      String   @default("manual") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  center PreferenceCenter @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  @@index([centerId, email])
+  @@index([centerId, externalId])
+  @@map("user_preferences")
+}
+
+// ─── Agent System ────────────────────────────────────────────────────────────
+
+enum AgentType {
+  scanner
+  dsar_processor
+  policy_generator
+  compliance_monitor
+  data_mapper
+  pia_assessor
+  vendor_reviewer
+}
+
+enum AgentRunStatus {
+  queued
+  running
+  completed
+  failed
+  cancelled
+}
+
+model AgentRun {
+  id          String         @id @default(uuid()) @db.Uuid
+  orgId       String         @map("org_id") @db.Uuid
+  agentType   AgentType      @map("agent_type")
+  trigger     String         @db.VarChar(50)
+  status      AgentRunStatus @default(queued)
+
+  input       Json?
+  output      Json?
+  logs        Json?
+  tokensUsed  Int            @default(0) @map("tokens_used")
+  costCents   Int            @default(0) @map("cost_cents")
+
+  startedAt   DateTime?      @map("started_at")
+  completedAt DateTime?      @map("completed_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, agentType])
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("agent_runs")
 }

@@ -1,14 +1,59 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useState } from "react";
+import { api } from "@/lib/trpc";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy — Custodia",
-};
+export default function PolicyPage() {
+  const params = useParams();
+  const siteId = params.siteId as string;
+  const utils = api.useUtils();
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-export default async function PolicyPage(props: {
-  params: Promise<{ siteId: string }>;
-}) {
-  const { siteId } = await props.params;
+  const { data: policy, isLoading, error } = api.policy.get.useQuery(
+    { siteId },
+    { enabled: !!siteId },
+  );
+
+  const generate = api.policy.generate.useMutation({
+    onSuccess: () => {
+      setSaveError(null);
+      void utils.policy.get.invalidate({ siteId });
+      void utils.policy.versions.invalidate({ siteId });
+    },
+    onError: (e) => setSaveError(e.message),
+  });
+
+  const publish = api.policy.publish.useMutation({
+    onSuccess: () => {
+      setSaveError(null);
+      void utils.policy.get.invalidate({ siteId });
+    },
+    onError: (e) => setSaveError(e.message),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-6 lg:p-8">
+        <p className="text-sm text-slate-500">Loading policy…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 lg:p-8">
+        <Link href={`/sites/${siteId}`} className="text-sm text-navy-600 hover:underline dark:text-navy-400">
+          ← Back to site
+        </Link>
+        <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error.message}</p>
+      </div>
+    );
+  }
+
+  const html = policy?.contentHtml?.trim();
+  const markdownFallback = policy?.contentMarkdown;
 
   return (
     <div className="p-6 lg:p-8">
@@ -22,117 +67,75 @@ export default async function PolicyPage(props: {
         Back
       </Link>
 
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Privacy Policy
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Privacy policy</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            AI-generated privacy policy based on your latest scan results.
-            Auto-updates when your site changes.
+            Stored in <code className="text-xs">policies</code> for this site. Generate uses your latest completed
+            scan + AI.
           </p>
+          {policy && (
+            <p className="mt-2 text-xs text-slate-400">
+              Version {policy.version}
+              {policy.generatedAt && ` · Generated ${new Date(policy.generatedAt).toLocaleString()}`}
+              {policy.publishedAt && ` · Published ${new Date(policy.publishedAt).toLocaleString()}`}
+            </p>
+          )}
         </div>
-        <div className="flex gap-2">
-          <button className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900">
-            Regenerate
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={generate.isPending}
+            onClick={() => generate.mutate({ siteId })}
+            className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+          >
+            {generate.isPending ? "Regenerating…" : "Regenerate"}
           </button>
-          <button className="rounded-lg bg-navy-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-900 dark:bg-navy-600 dark:hover:bg-navy-500">
-            Publish
+          <button
+            type="button"
+            disabled={!policy || publish.isPending}
+            onClick={() => publish.mutate({ siteId })}
+            className="rounded-lg bg-navy-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-900 disabled:opacity-50 dark:bg-navy-600 dark:hover:bg-navy-500"
+          >
+            {publish.isPending ? "Publishing…" : "Publish"}
           </button>
         </div>
       </div>
 
+      {saveError && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+          {saveError}
+        </p>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Policy content */}
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-950">
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <h2>Privacy Policy</h2>
-              <p className="text-xs text-slate-400">
-                Last updated: March 18, 2026
+            {!policy ? (
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                No policy row yet. Run a completed scan, then click <strong>Regenerate</strong> to create one in the
+                database.
               </p>
-
-              <h3>1. Information We Collect</h3>
-              <p>
-                We collect information you provide directly to us, such as when
-                you create an account, make a purchase, or contact us for
-                support. This includes your name, email address, shipping
-                address, and payment information.
-              </p>
-
-              <h3>2. Cookies and Tracking Technologies</h3>
-              <p>
-                Our website uses the following tracking technologies identified
-                by our automated scanner:
-              </p>
-              <ul>
-                <li>
-                  <strong>Google Analytics (GA4)</strong> — Analytics tracking
-                  to understand site usage patterns
-                </li>
-                <li>
-                  <strong>Stripe.js</strong> — Essential payment processing
-                  functionality
-                </li>
-                <li>
-                  <strong>Cloudflare</strong> — Performance and security
-                  infrastructure
-                </li>
-              </ul>
-
-              <h3>3. How We Use Your Information</h3>
-              <p>
-                We use the information we collect to provide, maintain, and
-                improve our services, process transactions, and send you
-                technical notices and support messages.
-              </p>
-
-              <h3>4. Your Rights</h3>
-              <p>
-                Depending on your location, you may have certain rights
-                regarding your personal information, including the right to
-                access, correct, delete, or port your data.
-              </p>
-            </div>
+            ) : html ? (
+              <article
+                className="prose prose-sm max-w-none dark:prose-invert"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            ) : (
+              <pre className="whitespace-pre-wrap font-sans text-sm text-slate-800 dark:text-slate-200">
+                {markdownFallback ?? "(empty)"}
+              </pre>
+            )}
           </div>
         </div>
 
-        {/* AI explanation sidebar */}
-        <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">
-              AI Explanation
-            </h3>
-            <div className="space-y-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              <p>
-                <strong className="text-slate-700 dark:text-slate-300">
-                  Section 1:
-                </strong>{" "}
-                Lists the personal data you collect. Based on our scan, your
-                checkout collects name, email, and payment info via Stripe.
-              </p>
-              <p>
-                <strong className="text-slate-700 dark:text-slate-300">
-                  Section 2:
-                </strong>{" "}
-                Discloses the 5 trackers we found. We recommend adding consent
-                controls for GA4 and Hotjar since they are non-essential.
-              </p>
-              <p>
-                <strong className="text-slate-700 dark:text-slate-300">
-                  Section 4:
-                </strong>{" "}
-                Covers GDPR and CCPA user rights. Since you have EU visitors,
-                this section is required.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-compliant/20 bg-compliant-light p-4 dark:bg-green-900/20">
-            <p className="text-xs font-medium text-green-800 dark:text-green-400">
-              This policy covers GDPR, CCPA/CPRA, and applicable US state
-              privacy laws based on your detected visitor jurisdictions.
-            </p>
+        <div className="space-y-4 text-sm text-slate-600 dark:text-slate-400">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+            <p className="font-medium text-slate-900 dark:text-white">How to populate</p>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
+              <li>Seed: run <code className="text-[11px]">npm run db:seed</code> (see docs)</li>
+              <li>UI: Regenerate (needs Anthropic API key + completed scan)</li>
+            </ul>
           </div>
         </div>
       </div>

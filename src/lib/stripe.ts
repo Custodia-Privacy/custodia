@@ -1,6 +1,5 @@
 /**
- * Stripe client configuration.
- * Initialized once dependencies are installed.
+ * Stripe client configuration + plan limits aligned with Prisma `Plan` enum.
  */
 
 export const PLANS = {
@@ -17,7 +16,7 @@ export const PLANS = {
   },
   starter: {
     name: "Starter",
-    price: 2900, // cents
+    price: 2900,
     stripePriceId: process.env.STRIPE_STARTER_PRICE_ID,
     sites: 1,
     scansPerMonth: 10,
@@ -26,12 +25,12 @@ export const PLANS = {
     banner: true,
     policy: true,
     teamMembers: 3,
-    consentLogRetention: 90, // days
+    consentLogRetention: 90,
   },
-  pro: {
-    name: "Pro",
-    price: 4900, // cents
-    stripePriceId: process.env.STRIPE_PRO_PRICE_ID,
+  growth: {
+    name: "Growth",
+    price: 7900,
+    stripePriceId: process.env.STRIPE_GROWTH_PRICE_ID,
     sites: 5,
     scansPerMonth: 50,
     monitoring: true,
@@ -39,7 +38,20 @@ export const PLANS = {
     banner: true,
     policy: true,
     teamMembers: 10,
-    consentLogRetention: 365, // days
+    consentLogRetention: 365,
+  },
+  business: {
+    name: "Business",
+    price: 14900,
+    stripePriceId: process.env.STRIPE_BUSINESS_PRICE_ID,
+    sites: 25,
+    scansPerMonth: 200,
+    monitoring: true,
+    monitoringFrequency: "daily" as const,
+    banner: true,
+    policy: true,
+    teamMembers: 50,
+    consentLogRetention: 730,
   },
 } as const;
 

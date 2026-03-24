@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, orgProcedure } from "../trpc";
 import { PLANS } from "@/lib/stripe";
+import { DEFAULT_BANNER_CONFIG } from "@/lib/banner-defaults";
 
 const bannerConfigSchema = z.object({
   position: z.enum(["bottom", "bottom-left", "bottom-right", "center"]).default("bottom"),
@@ -49,51 +50,17 @@ export const bannerRouter = createRouter({
         banner = await ctx.db.banner.create({
           data: {
             siteId: input.siteId,
-            config: {
-              position: "bottom",
-              theme: "light",
-              primaryColor: "#4F46E5",
-              showLogo: true,
-              customCss: "",
-              content: {
-                title: "We value your privacy",
-                description:
-                  "We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. By clicking 'Accept All', you consent to our use of cookies.",
-                acceptAllText: "Accept All",
-                rejectAllText: "Reject All",
-                customizeText: "Customize",
-                privacyPolicyUrl: "/privacy",
-              },
-              categories: [
-                {
-                  key: "necessary",
-                  name: "Necessary",
-                  description: "Essential cookies required for the website to function properly.",
-                  required: true,
-                  cookies: [],
-                },
-                {
-                  key: "analytics",
-                  name: "Analytics",
-                  description: "Help us understand how visitors interact with our website.",
-                  required: false,
-                  cookies: [],
-                },
-                {
-                  key: "marketing",
-                  name: "Marketing",
-                  description: "Used to deliver relevant advertisements.",
-                  required: false,
-                  cookies: [],
-                },
-              ],
-              regulations: {
-                gdpr: { enabled: true, mode: "opt-in" },
-                ccpa: { enabled: true, mode: "opt-out" },
-              },
-            },
+            config: DEFAULT_BANNER_CONFIG as unknown as object,
           },
         });
+      } else {
+        const parsed = bannerConfigSchema.safeParse(banner.config);
+        if (!parsed.success) {
+          banner = await ctx.db.banner.update({
+            where: { siteId: input.siteId },
+            data: { config: DEFAULT_BANNER_CONFIG as unknown as object },
+          });
+        }
       }
 
       return banner;
@@ -114,7 +81,7 @@ export const bannerRouter = createRouter({
       if (!planLimits.banner) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Cookie banners are not available on the Free plan. Upgrade to Starter or Pro.",
+          message: "Cookie banners are not available on the Free plan. Upgrade to Starter, Growth, or Business.",
         });
       }
 
@@ -139,7 +106,7 @@ export const bannerRouter = createRouter({
       if (!planLimits.banner) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Cookie banners require a Starter or Pro plan.",
+          message: "Cookie banners require a Starter, Growth, or Business plan.",
         });
       }
 
@@ -163,7 +130,10 @@ export const bannerRouter = createRouter({
       const banner = await ctx.db.banner.findUnique({ where: { siteId: input.siteId } });
       if (!banner) throw new TRPCError({ code: "NOT_FOUND", message: "Banner not found" });
 
-      return generateBannerPreview(banner.config as any, input.siteId);
+      const parsed = bannerConfigSchema.safeParse(banner.config);
+      const config = parsed.success ? parsed.data : DEFAULT_BANNER_CONFIG;
+
+      return generateBannerPreview(config as any, input.siteId);
     }),
 });
 

@@ -221,4 +221,27 @@ export const scanRouter = createRouter({
         unchanged,
       };
     }),
+
+  /** Latest findings for a site (dashboard site detail) */
+  recentFindings: orgProcedure
+    .input(
+      z.object({
+        siteId: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const site = await ctx.db.site.findFirst({
+        where: { id: input.siteId, orgId: ctx.orgId, deletedAt: null },
+      });
+      if (!site) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Site not found" });
+      }
+
+      return ctx.db.finding.findMany({
+        where: { siteId: input.siteId },
+        orderBy: [{ severity: "asc" }, { createdAt: "desc" }],
+        take: input.limit,
+      });
+    }),
 });
