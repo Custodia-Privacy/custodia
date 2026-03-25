@@ -6,7 +6,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Custodia brand colors */
+  /* ──────────────────────────────────────────
+     Custodia Design Tokens
+     See design-system.md for full documentation
+     ────────────────────────────────────────── */
+
+  /* Primary — Indigo (brand color) */
   --color-navy-50: #eef2ff;
   --color-navy-100: #e0e7ff;
   --color-navy-200: #c7d2fe;
@@ -19,6 +24,7 @@
   --color-navy-900: #312e81;
   --color-navy-950: #1e1b4b;
 
+  /* Semantic — Status colors */
   --color-compliant: #10b981;
   --color-compliant-light: #d1fae5;
   --color-warning: #f59e0b;
@@ -30,12 +36,49 @@
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
+
+  /* Surface & border tokens (light) */
+  --surface: #ffffff;
+  --surface-raised: #f8fafc;
+  --border-default: #e2e8f0;
+  --border-muted: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #020617;
     --foreground: #e2e8f0;
+
+    /* Surface & border tokens (dark) */
+    --surface: #0f172a;
+    --surface-raised: #1e293b;
+    --border-default: #334155;
+    --border-muted: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.2);
+    --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
   }
 }
 

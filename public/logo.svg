@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 44" fill="none">
+  <!-- Custodia shield mark: two overlapping shapes forming a shield with a subtle "C" in negative space -->
+  <!-- Geometric edge (protection) -->
+  <path d="M20 2L4 10v14c0 9.94 6.84 19.22 16 21.5 9.16-2.28 16-11.56 16-21.5V10L20 2z" fill="#4338ca"/>
+  <!-- Data flowing curve -->
+  <path d="M20 6L8 12.5v11.5c0 7.75 5.33 14.98 12 16.75V6z" fill="#6366f1"/>
+  <!-- Inner shield highlight -->
+  <path d="M20 10l-8 4.5v8c0 5.52 3.42 10.64 8 12.5V10z" fill="#818cf8" opacity="0.5"/>
+  <!-- Checkmark accent -->
+  <path d="M15 22l3.5 3.5L25 18" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

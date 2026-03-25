@@ -2,21 +2,27 @@
 
 ## Design Tokens
 
+> **Implementation note:** In the codebase, primary colors use the `navy-*` prefix
+> (e.g., `bg-navy-700`, `text-navy-50`). The CSS variables are defined in
+> `src/app/globals.css` and the Tailwind config is in `tailwind.config.ts`.
+> Brand SVG assets are in `/public/logo.svg`, `/public/logo-wordmark.svg`,
+> `/public/logo-wordmark-white.svg`, and `/public/favicon.svg`.
+
 ### Color Palette
 
-#### Primary — Indigo
+#### Primary — Indigo (CSS: `--color-navy-*`, Tailwind: `navy-*`)
 ```
---color-primary-50:  #eef2ff
---color-primary-100: #e0e7ff
---color-primary-200: #c7d2fe
---color-primary-300: #a5b4fc
---color-primary-400: #818cf8
---color-primary-500: #6366f1
---color-primary-600: #4f46e5
---color-primary-700: #4338ca
---color-primary-800: #3730a3
---color-primary-900: #312e81
---color-primary-950: #1e1b4b
+--color-navy-50:  #eef2ff
+--color-navy-100: #e0e7ff
+--color-navy-200: #c7d2fe
+--color-navy-300: #a5b4fc
+--color-navy-400: #818cf8
+--color-navy-500: #6366f1
+--color-navy-600: #4f46e5
+--color-navy-700: #4338ca
+--color-navy-800: #3730a3
+--color-navy-900: #312e81
+--color-navy-950: #1e1b4b
 ```
 
 #### Neutral — Slate
