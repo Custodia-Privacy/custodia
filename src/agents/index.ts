@@ -10,6 +10,9 @@ import { ScannerAgent } from "./scanner-agent";
 import { DsarAgent } from "./dsar-agent";
 import { PolicyAgent } from "./policy-agent";
 import { ComplianceAgent } from "./compliance-agent";
+import { DataMapperAgent } from "./data-mapper-agent";
+import { PiaAssessorAgent } from "./pia-assessor-agent";
+import { VendorReviewerAgent } from "./vendor-reviewer-agent";
 
 type AgentType =
   | "scanner"
@@ -31,6 +34,9 @@ const AGENT_REGISTRY: Partial<Record<AgentType, AgentConstructor>> = {
   dsar_processor: DsarAgent,
   policy_generator: PolicyAgent,
   compliance_monitor: ComplianceAgent,
+  data_mapper: DataMapperAgent,
+  pia_assessor: PiaAssessorAgent,
+  vendor_reviewer: VendorReviewerAgent,
 };
 
 /**
@@ -106,3 +112,6 @@ export { ScannerAgent } from "./scanner-agent";
 export { DsarAgent } from "./dsar-agent";
 export { PolicyAgent } from "./policy-agent";
 export { ComplianceAgent } from "./compliance-agent";
+export { DataMapperAgent } from "./data-mapper-agent";
+export { PiaAssessorAgent } from "./pia-assessor-agent";
+export { VendorReviewerAgent } from "./vendor-reviewer-agent";
