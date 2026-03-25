@@ -179,6 +179,41 @@ export const scanRouter = createRouter({
       return { scanId: scan.id, status: "queued" as const };
     }),
 
+  /** Public poll for quick scan results (no auth required) */
+  quickResult: publicProcedure
+    .input(z.object({ scanId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const scan = await ctx.db.scan.findUnique({
+        where: { id: input.scanId },
+        include: {
+          site: { select: { domain: true } },
+          findings: {
+            orderBy: [{ severity: "asc" }, { createdAt: "desc" }],
+            take: 50,
+          },
+        },
+      });
+      if (!scan) throw new TRPCError({ code: "NOT_FOUND", message: "Scan not found" });
+
+      return {
+        scanId: scan.id,
+        status: scan.status,
+        domain: scan.site.domain,
+        pagesCrawled: scan.pagesCrawled,
+        complianceScores: scan.complianceScores,
+        summary: scan.summary,
+        errorMessage: scan.errorMessage,
+        findings: scan.findings.map((f) => ({
+          id: f.id,
+          title: f.title,
+          description: f.description,
+          category: f.category,
+          severity: f.severity,
+          recommendation: f.recommendation,
+        })),
+      };
+    }),
+
   /** Compare two scans side by side */
   compare: orgProcedure
     .input(
