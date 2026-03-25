@@ -44,7 +44,7 @@ export default function VendorsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Vendors</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Rows in <code className="text-xs">vendors</code>. Add vendors here or via seed / API / MCP.
+            Track third-party vendors, assess their privacy risk, and monitor compliance status.
           </p>
         </div>
         <button

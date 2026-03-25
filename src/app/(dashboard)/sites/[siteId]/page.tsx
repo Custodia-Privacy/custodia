@@ -206,7 +206,7 @@ export default function SiteDetailPage() {
           <p className="text-sm text-slate-500">Loading findings…</p>
         ) : !findings?.length ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            No findings yet. Complete a scan (scanner worker + Redis) to populate this list.
+            No findings yet. Run a scan to detect trackers, cookies, and compliance issues.
           </p>
         ) : (
           <div className="space-y-3">

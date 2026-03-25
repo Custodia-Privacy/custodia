@@ -33,8 +33,7 @@ export default function SitesPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Your Sites</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Sites are stored in PostgreSQL. Adding a site creates a row and queues a scan job
-            (requires Redis + scanner worker for results).
+            Manage the websites you monitor for privacy compliance. Add a site to start scanning.
           </p>
         </div>
         <button
@@ -146,9 +145,7 @@ export default function SitesPage() {
           {(sites?.length ?? 0) === 0 && (
             <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-950">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                No sites in the database yet. Use <strong>+ Add Site</strong> or run{" "}
-                <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">npm run db:seed</code>{" "}
-                after setting <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">SEED_USER_EMAIL</code>.
+                No sites yet. Click <strong>+ Add Site</strong> above to add your first website and start a privacy scan.
               </p>
             </div>
           )}

@@ -1,31 +1,224 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-/**
- * API Endpoint Tests - Consent Management
- *
- * Stubs for consent management endpoints.
- */
-describe("POST /api/consent/record", () => {
-  it.todo("should record a consent decision with timestamp");
-  it.todo("should require visitor ID and consent categories");
-  it.todo("should store jurisdiction information");
-  it.todo("should generate a consent receipt");
+// Mock dependencies
+vi.mock("@/lib/db", () => ({
+  db: {
+    consentLog: { create: vi.fn() },
+    site: { findUnique: vi.fn() },
+  },
+}));
+
+vi.mock("@/lib/privacy-webhook", () => ({
+  deliverPrivacyWebhook: vi.fn(),
+}));
+
+import { POST, OPTIONS } from "@/app/api/banner/[siteId]/consent/route";
+import { db } from "@/lib/db";
+import { deliverPrivacyWebhook } from "@/lib/privacy-webhook";
+
+const SITE_ID = "test-site-123";
+
+function makeRequest(
+  body: unknown,
+  headers?: Record<string, string>,
+): Request {
+  return new Request(`http://localhost:3000/api/banner/${SITE_ID}/consent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function makeProps() {
+  return { params: Promise.resolve({ siteId: SITE_ID }) };
+}
+
+const validBody = {
+  consent: { analytics: true, marketing: false },
+  action: "accept_selected",
+  visitorId: "visitor-abc-123",
+  userAgent: "Mozilla/5.0",
+};
+
+describe("POST /api/banner/[siteId]/consent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(db.consentLog.create).mockResolvedValue({
+      id: "log-1",
+      siteId: SITE_ID,
+      visitorId: "visitor-abc-123",
+    } as any);
+    vi.mocked(db.site.findUnique).mockResolvedValue(null);
+  });
+
+  it("should record consent and return ok:true", async () => {
+    const req = makeRequest(validBody);
+    const response = await POST(req, makeProps());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+  });
+
+  it("should create a consent log record", async () => {
+    const req = makeRequest(validBody);
+    await POST(req, makeProps());
+
+    expect(db.consentLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        siteId: SITE_ID,
+        visitorId: "visitor-abc-123",
+        consentGiven: validBody.consent,
+        action: "accept_selected",
+      }),
+    });
+  });
+
+  it("should return 400 when consent field is missing", async () => {
+    const req = makeRequest({ action: "accept", visitorId: "v1" });
+    const response = await POST(req, makeProps());
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain("Missing");
+  });
+
+  it("should return 400 when action field is missing", async () => {
+    const req = makeRequest({ consent: { analytics: true }, visitorId: "v1" });
+    const response = await POST(req, makeProps());
+    expect(response.status).toBe(400);
+  });
+
+  it("should return 400 when visitorId is missing", async () => {
+    const req = makeRequest({ consent: { analytics: true }, action: "accept" });
+    const response = await POST(req, makeProps());
+    expect(response.status).toBe(400);
+  });
+
+  it("should detect GDPR jurisdiction from cf-ipcountry header", async () => {
+    const req = makeRequest(validBody, { "cf-ipcountry": "DE" });
+    await POST(req, makeProps());
+
+    expect(db.consentLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ipCountry: "DE",
+        jurisdiction: "gdpr",
+      }),
+    });
+  });
+
+  it("should detect CCPA jurisdiction for US country code", async () => {
+    const req = makeRequest(validBody, { "cf-ipcountry": "US" });
+    await POST(req, makeProps());
+
+    expect(db.consentLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ipCountry: "US",
+        jurisdiction: "ccpa",
+      }),
+    });
+  });
+
+  it("should set jurisdiction to null for unknown countries", async () => {
+    const req = makeRequest(validBody, { "cf-ipcountry": "JP" });
+    await POST(req, makeProps());
+
+    expect(db.consentLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ipCountry: "JP",
+        jurisdiction: null,
+      }),
+    });
+  });
+
+  it("should fallback to x-vercel-ip-country when cf-ipcountry absent", async () => {
+    const req = makeRequest(validBody, { "x-vercel-ip-country": "FR" });
+    await POST(req, makeProps());
+
+    expect(db.consentLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ipCountry: "FR",
+        jurisdiction: "gdpr",
+      }),
+    });
+  });
+
+  it("should include CORS headers in response", async () => {
+    const req = makeRequest(validBody);
+    const response = await POST(req, makeProps());
+
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(response.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+  });
+
+  it("should trigger privacy webhook when site has webhook configured", async () => {
+    vi.mocked(db.site.findUnique).mockResolvedValue({
+      orgId: "org-1",
+      domain: "example.com",
+      privacyWebhookUrl: "https://hooks.example.com/consent",
+      privacyWebhookSecret: "whsec_test123",
+    } as any);
+
+    const req = makeRequest(validBody);
+    await POST(req, makeProps());
+
+    expect(deliverPrivacyWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://hooks.example.com/consent",
+        secret: "whsec_test123",
+        event: "consent.recorded",
+      }),
+    );
+  });
+
+  it("should NOT trigger webhook when site has no webhook configured", async () => {
+    vi.mocked(db.site.findUnique).mockResolvedValue({
+      orgId: "org-1",
+      domain: "example.com",
+      privacyWebhookUrl: null,
+      privacyWebhookSecret: null,
+    } as any);
+
+    const req = makeRequest(validBody);
+    await POST(req, makeProps());
+
+    expect(deliverPrivacyWebhook).not.toHaveBeenCalled();
+  });
+
+  it("should truncate userAgent to 500 characters", async () => {
+    const longUA = "A".repeat(600);
+    const req = makeRequest({ ...validBody, userAgent: longUA });
+    await POST(req, makeProps());
+
+    expect(db.consentLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userAgent: "A".repeat(500),
+      }),
+    });
+  });
+
+  it("should return 500 on database error", async () => {
+    vi.mocked(db.consentLog.create).mockRejectedValue(new Error("DB down"));
+
+    const req = makeRequest(validBody);
+    const response = await POST(req, makeProps());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toContain("Failed");
+  });
 });
 
-describe("GET /api/consent/:visitorId", () => {
-  it.todo("should return current consent status for a visitor");
-  it.todo("should return 404 for unknown visitors");
-});
+describe("OPTIONS /api/banner/[siteId]/consent", () => {
+  it("should return CORS preflight headers", async () => {
+    const response = await OPTIONS();
 
-describe("PUT /api/consent/:visitorId", () => {
-  it.todo("should update consent preferences");
-  it.todo("should create an audit trail entry on update");
-});
-
-describe("GET /api/consent/banner/:siteId", () => {
-  it.todo("should return banner configuration based on scan results");
-  it.todo("should apply correct legal framework based on visitor jurisdiction");
-  it.todo("should support GDPR opt-in mode");
-  it.todo("should support CCPA opt-out mode");
-  it.todo("should support Google Consent Mode v2");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(response.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+    expect(response.headers.get("Access-Control-Allow-Headers")).toContain("Content-Type");
+  });
 });

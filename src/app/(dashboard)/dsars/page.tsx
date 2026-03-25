@@ -141,8 +141,7 @@ export default function DsarsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">DSAR Requests</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Rows are stored in <code className="text-xs">dsar_requests</code>. Use{" "}
-            <strong>New Request</strong> or <code className="text-xs">npm run db:seed</code>.
+            Track and manage data subject access requests across all jurisdictions.
           </p>
         </div>
         <button
@@ -159,8 +158,7 @@ export default function DsarsPage() {
           <h2 className="text-sm font-semibold text-navy-950 dark:text-white">Public DSAR form</h2>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
             Share this link on your privacy policy or contact page. Submissions create rows in{" "}
-            <code className="text-[11px]">dsar_requests</code> and email the org owner when{" "}
-            <code className="text-[11px]">RESEND_API_KEY</code> is set.
+            your dashboard and notify your team by email.
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
             <label className="text-xs text-slate-500 dark:text-slate-400">
@@ -336,7 +334,7 @@ export default function DsarsPage() {
               ) : !list?.length ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                    No DSARs yet. Create one above or run the seed script.
+                    No DSAR requests yet. Create one above or share the public form link.
                   </td>
                 </tr>
               ) : (

@@ -40,8 +40,7 @@ export default function DataMapPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Data Map</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Data from <code className="text-xs">data_stores</code> and <code className="text-xs">data_flows</code>.
-            Use <strong>Add Data Store</strong> or run <code className="text-xs">npm run db:seed</code>.
+            Map where personal data lives across your organization and track how it flows between systems.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -214,7 +213,7 @@ export default function DataMapPage() {
               ) : !stores?.length ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                    No rows in <code>data_stores</code>.
+                    No data stores registered yet. Add one above to start mapping your data.
                   </td>
                 </tr>
               ) : (

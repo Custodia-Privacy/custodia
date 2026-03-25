@@ -131,10 +131,10 @@ export default function PolicyPage() {
 
         <div className="space-y-4 text-sm text-slate-600 dark:text-slate-400">
           <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-            <p className="font-medium text-slate-900 dark:text-white">How to populate</p>
+            <p className="font-medium text-slate-900 dark:text-white">How it works</p>
             <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
-              <li>Seed: run <code className="text-[11px]">npm run db:seed</code> (see docs)</li>
-              <li>UI: Regenerate (needs Anthropic API key + completed scan)</li>
+              <li>Run a scan on this site to detect trackers and cookies</li>
+              <li>Click <strong>Regenerate</strong> to create or update the policy using AI</li>
             </ul>
           </div>
         </div>

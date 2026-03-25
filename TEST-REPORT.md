@@ -1,7 +1,7 @@
 # Custodia - QA Test Report
 
-**Date:** 2026-03-22
-**Tester:** qa-tester (d6b49b275bcd)
+**Date:** 2026-03-25
+**Tester:** qa-tester (5a453c3dbb02)
 **Project:** Custodia Privacy Platform
 
 ---
@@ -10,89 +10,125 @@
 
 | Category | Passed | Failed | Skipped/Todo | Total |
 |----------|--------|--------|-------------|-------|
-| Unit Tests (Vitest) | 10 | 0 | 67 todo | 77 |
-| E2E Tests (Playwright) | 4 | 0 | 15 skipped | 19 |
-| **Total** | **14** | **0** | **82** | **96** |
+| Unit Tests (Vitest) | 71 | 0 | 14 todo | 85 |
+| E2E Tests (Playwright) | 18 | 0 | 1 skipped | 19 |
+| **Total** | **89** | **0** | **15** | **104** |
 
 **Result: ALL IMPLEMENTED TESTS PASS**
 
 ---
 
-## Test Infrastructure Setup
+## Test Infrastructure
 
-- **Unit/Component Testing:** Vitest + React Testing Library + jsdom
-- **E2E Testing:** Playwright (Chromium)
+- **Unit/Component Testing:** Vitest 4.1.0 + React Testing Library + jsdom
+- **E2E Testing:** Playwright 1.58.2 (Chromium)
 - **Config files:** `vitest.config.ts`, `playwright.config.ts`
-- **Test commands:** `npm test` (unit), `npm run test:e2e` (E2E), `npm run test:all` (both)
+- **Test commands:** `npm test` (unit), `npx playwright test` (E2E), `npm run test:all` (both)
 
 ---
 
 ## Unit Test Results
 
-### `src/__tests__/app/page.test.tsx` — 8 tests, all passing
-- ✅ Renders without crashing
-- ✅ Renders heading with getting started text
-- ✅ Renders the Next.js logo
-- ✅ Renders "Deploy Now" link with correct attributes
-- ✅ Renders "Documentation" link
-- ✅ Renders Templates and Learning links
-- ✅ Has proper dark mode classes
-- ✅ Renders responsive layout classes
+### Library Tests
 
-### `src/__tests__/app/layout.test.tsx` — 2 tests, all passing
-- ✅ Exports metadata with title and description
-- ✅ Exports a default function (RootLayout)
+| File | Tests | Status |
+|------|-------|--------|
+| `lib/dsar-deadlines.test.ts` | 8 | All pass |
+| `lib/public-rate-limit.test.ts` | 6 | All pass |
 
-### `src/__tests__/api/scan.test.ts` — 16 todo stubs
-- Stubs for POST /api/scan, GET /api/scan/:id, GET /api/scan/:id/trackers
-- Edge cases: headless browser blocking, timeouts, CSP, empty results
+**dsar-deadlines:** Tests GDPR (30d), CCPA (45d), LGPD (15d), PIPEDA (30d) deadlines, unknown jurisdiction fallback, case-insensitivity, default date, and input immutability.
 
-### `src/__tests__/api/auth.test.ts` — 13 todo stubs
-- Stubs for signup, signin, signout endpoints
-- Edge cases: expired sessions, CSRF, input sanitization
+**public-rate-limit:** Tests first request allowed, max limit enforcement, rejection beyond limit with retryAfterSec, window expiry, independent key tracking, and correct seconds conversion.
 
-### `src/__tests__/api/consent.test.ts` — 12 todo stubs
-- Stubs for consent recording, retrieval, update, banner config
-- Jurisdiction-specific tests (GDPR, CCPA, Google Consent Mode v2)
+### API Route Tests
 
-### `src/__tests__/api/policy.test.ts` — 8 todo stubs
-- Stubs for policy generation, retrieval, regeneration
+| File | Tests | Status |
+|------|-------|--------|
+| `api/health.test.ts` | 3 | All pass |
+| `api/signup.test.ts` | 10 | All pass |
+| `api/dsar.test.ts` | 12 | All pass |
+| `api/consent.test.ts` | 14 + 1 | All pass |
+| `api/auth.test.ts` | 7 | All pass |
+| `api/scan.test.ts` | 3 + 7 todo | Implemented pass |
+| `api/policy.test.ts` | 2 + 4 todo | Implemented pass |
 
-### `src/__tests__/api/dsar.test.ts` — 18 todo stubs
-- Stubs for DSAR submission, status, updates, AI response generation
+**health:** Validates 200/ok:true when DB is up, 503/ok:false when DB is down, ISO timestamp format.
+
+**signup:** Tests valid user creation (201), default org creation, custom orgName, 409 for duplicate email, invited user upgrade path, 400 for invalid email/short password/missing name/empty name/long password.
+
+**dsar (public endpoint):** Tests valid submission (201), all 6 request types, invalid JSON (400), missing fields (400), invalid email (400), non-UUID siteId (400), invalid requestType (400), site not found (404), rate limiting (429 + Retry-After header), honeypot detection (silent 201), optional fields, details max length, IP extraction for rate limit key.
+
+**consent:** Tests consent recording (200), consent log creation, missing fields (400 x3), GDPR jurisdiction detection from cf-ipcountry, CCPA for US, null for unknown countries, x-vercel-ip-country fallback, CORS headers, webhook trigger when configured, no webhook when not configured, userAgent truncation to 500 chars, database error (500). Also tests OPTIONS preflight CORS.
+
+**auth:** Tests credentials authorize logic: missing email/password returns null, user not found returns null, OAuth-only user (no passwordHash) returns null, wrong password returns null, valid credentials return user data.
+
+### Component Tests
+
+| File | Tests | Status |
+|------|-------|--------|
+| `app/page.test.tsx` | 2 | All pass (fixed tRPC mock) |
+| `app/layout.test.tsx` | 2 | All pass |
 
 ---
 
 ## E2E Test Results
 
-### `e2e/homepage.spec.ts` — 4 passing, 6 skipped
-- ✅ Homepage loads successfully
-- ✅ Main content area renders
-- ✅ Heading is visible
-- ✅ Responsive on mobile viewport
-- ⏭️ Hero section, pricing, features, comparison, CTA, FAQ (skipped — not yet built)
+### Homepage / Landing Page (8 tests)
 
-### `e2e/scan-flow.spec.ts` — 0 passing, 9 skipped
-- ⏭️ Free scan flow, auth flow, dashboard flow (skipped — not yet built)
+| Test | Status |
+|------|--------|
+| Homepage loads successfully | Pass |
+| Main content area visible | Pass |
+| Heading visible | Pass |
+| Mobile responsive (375x812) | Pass |
+| Hero privacy messaging | Pass |
+| Navigation links visible | Pass |
+| Pricing page loads | Pass |
+| Pricing tiers displayed | Pass |
+
+### Auth Flow (4 tests)
+
+| Test | Status |
+|------|--------|
+| Login page with email input | Pass |
+| Signup page loads | Pass |
+| Dashboard redirects to login | Pass |
+| Protected routes redirect to login | Pass |
+
+### API Integration (6 tests)
+
+| Test | Status |
+|------|--------|
+| Health check returns status | Pass |
+| DSAR API rejects empty body | Pass |
+| DSAR API rejects invalid JSON | Pass |
+| DSAR API returns 404 for missing site | Pass |
+| Consent API CORS on OPTIONS | Pass |
+| Consent API rejects missing fields | Pass |
+
+### Skipped (1)
+
+| Test | Reason |
+|------|--------|
+| Embedded DSAR form render | Requires valid siteId in database |
 
 ---
 
-## Issues Found
+## Bugs Found & Fixed
 
-1. **Minor:** Default Next.js metadata still present (`title: "Create Next App"`, `description: "Generated by create next app"`) — should be updated to Custodia branding.
-2. **Minor:** Next.js Image component warning for `/vercel.svg` — missing width/height auto styles for aspect ratio.
-3. **Note:** Backend API (473093cb) status is still `pending` — no API endpoints exist yet. All 67 API test stubs are `todo`.
-4. **Note:** Frontend (fed462b5) is `in_progress` — landing page is still the default Next.js scaffold.
+1. **page.test.tsx tRPC context error** — Landing page component test was failing because `Hero` and `CTA` components call `api.scan.quick.useMutation()` which requires tRPC React context. Fixed by mocking `@/lib/trpc` module.
+
+2. **Playwright baseURL mismatch** — Playwright was configured for `localhost:3000` but production runs on `localhost:3200` via PM2. Fixed by updating to use env var with 3200 default and setting `reuseExistingServer: true`.
 
 ---
 
-## Recommendations
+## Remaining Todo Tests (14)
 
-- Once backend-dev delivers API endpoints, convert the 67 `todo` stubs into full integration tests
-- Once frontend-dev delivers the landing page, convert the 15 skipped E2E tests into active tests
-- Add accessibility tests (axe-core) once UI components are in place
-- Add visual regression tests for the landing page once design is finalized
-- Set up CI pipeline to run `npm run test:all` on every PR
+These require integration test infrastructure (test database, tRPC context setup, Redis) or external service mocking (Claude API):
+
+- Scanner: 7 tests (tRPC procedures requiring auth context + scan engine)
+- Policy: 4 tests (Claude AI generation mocking)
+- Auth: 3 tests (rate limiting, CSRF, session management)
 
 ---
 
@@ -100,17 +136,31 @@
 
 ```
 src/__tests__/
-├── setup.ts                    # Test setup (jest-dom matchers)
+├── setup.ts                        # Test setup (jest-dom matchers)
 ├── app/
-│   ├── page.test.tsx           # Homepage component tests
-│   └── layout.test.tsx         # Layout component tests
+│   ├── page.test.tsx               # Landing page component tests
+│   └── layout.test.tsx             # Layout component tests
+├── lib/
+│   ├── dsar-deadlines.test.ts      # DSAR deadline calculation tests
+│   └── public-rate-limit.test.ts   # Rate limiter tests
 └── api/
-    ├── scan.test.ts            # Scanner API stubs
-    ├── auth.test.ts            # Auth API stubs
-    ├── consent.test.ts         # Consent API stubs
-    ├── policy.test.ts          # Policy API stubs
-    └── dsar.test.ts            # DSAR API stubs
+    ├── health.test.ts              # Health endpoint tests
+    ├── signup.test.ts              # Signup endpoint tests
+    ├── dsar.test.ts                # Public DSAR endpoint tests
+    ├── consent.test.ts             # Consent endpoint tests
+    ├── auth.test.ts                # Auth credentials tests
+    ├── scan.test.ts                # Scanner API tests
+    └── policy.test.ts              # Policy API tests
 e2e/
-├── homepage.spec.ts            # Homepage E2E tests
-└── scan-flow.spec.ts           # User flow E2E tests
+├── homepage.spec.ts                # Homepage + pricing E2E tests
+└── scan-flow.spec.ts               # Auth flow + API integration E2E tests
 ```
+
+---
+
+## Recommendations
+
+1. **Add integration test database** — Set up a test PostgreSQL instance to enable full tRPC router testing
+2. **Mock Claude API** — Create fixtures for AI-generated content to test policy/PIA flows
+3. **Add authenticated E2E tests** — Create test user seeding for dashboard, sites, DSAR management flows
+4. **CI pipeline** — Add `npm run test:all` to CI with Playwright browser caching

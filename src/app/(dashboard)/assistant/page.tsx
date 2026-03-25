@@ -155,8 +155,7 @@ export default function AssistantPage() {
         <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Setup assistant</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
           AI-guided onboarding with <strong>confirmed</strong> actions only. Proposals below run only when you click
-          Confirm. Server needs <code className="text-xs">ANTHROPIC_API_KEY</code>. Chat is rate-limited per user;
-          confirmations are stored in <code className="text-xs">audit_logs</code>.
+          Confirm. All actions are logged for your records.
         </p>
       </div>
 

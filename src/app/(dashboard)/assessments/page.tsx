@@ -145,7 +145,7 @@ export default function AssessmentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Privacy Assessments</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Stored in <code className="text-xs">assessments</code>. Create below or seed the database.
+            Run privacy impact assessments for new projects, vendors, and data processing changes.
           </p>
         </div>
         <button

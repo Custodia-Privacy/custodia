@@ -141,7 +141,7 @@ export default function ScansPage() {
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-                    No scans yet. Run a scan or add the site (worker + Redis) to process jobs.
+                    No scans yet. Click the scan button to analyze this site for privacy issues.
                   </td>
                 </tr>
               ) : (

@@ -68,6 +68,17 @@ const navSections: NavSection[] = [
         ),
       },
       {
+        label: "Data Map",
+        href: "/data-map",
+        icon: (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z"
+          />
+        ),
+      },
+      {
         label: "Vendors",
         href: "/vendors",
         icon: (
@@ -135,6 +146,7 @@ const settingsItem: NavItem = {
 interface SidebarProps {
   userName?: string;
   planName?: string;
+  onNavigate?: () => void;
 }
 
 function getInitials(name: string): string {
@@ -146,7 +158,7 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function Sidebar({ userName = "John Doe", planName = "Starter Plan" }: SidebarProps) {
+export function Sidebar({ userName = "John Doe", planName = "Starter Plan", onNavigate }: SidebarProps) {
   const pathname = usePathname();
 
   function isActive(href: string) {
@@ -162,6 +174,7 @@ export function Sidebar({ userName = "John Doe", planName = "Starter Plan" }: Si
       <Link
         key={item.href}
         href={item.href}
+        onClick={onNavigate}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
           active
             ? "bg-navy-50 text-navy-700 dark:bg-navy-950/50 dark:text-navy-300"

@@ -1,6 +1,27 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import LandingPage from "@/app/(marketing)/page";
+
+// Mock tRPC api before importing components that use it
+vi.mock("@/lib/trpc", () => ({
+  api: {
+    scan: {
+      quick: {
+        useMutation: vi.fn().mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isError: false,
+          isSuccess: false,
+          data: null,
+          error: null,
+          reset: vi.fn(),
+        }),
+      },
+    },
+    // Add other routers as needed
+    useUtils: vi.fn().mockReturnValue({}),
+  },
+}));
 
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) => {
@@ -8,6 +29,14 @@ vi.mock("next/image", () => ({
     return <img {...props} />;
   },
 }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: vi.fn().mockReturnValue({ push: vi.fn(), replace: vi.fn() }),
+  usePathname: vi.fn().mockReturnValue("/"),
+  useSearchParams: vi.fn().mockReturnValue(new URLSearchParams()),
+}));
+
+import LandingPage from "@/app/(marketing)/page";
 
 describe("Marketing landing page", () => {
   it("renders the primary hero heading", () => {

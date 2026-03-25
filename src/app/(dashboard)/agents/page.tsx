@@ -71,9 +71,7 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Privacy Agents</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Types are static; runs are rows in <code className="text-xs">agent_runs</code>. Use{" "}
-            <strong>Run Agent</strong> or the tRPC / MCP <code className="text-xs">agents.trigger</code>{" "}
-            procedure.
+            Autonomous AI agents that scan, analyze, and monitor your privacy compliance.
           </p>
         </div>
         <div className="relative">
