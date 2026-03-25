@@ -20,6 +20,10 @@ const PROJECT_LABELS: Record<string, string> = {
   data_migration: "Data migration",
   marketing_campaign: "Marketing campaign",
   feature_change: "Feature change",
+  pia: "PIA",
+  dpia: "DPIA",
+  ropa: "ROPA",
+  internal_assessment: "Internal assessment",
   other: "Other",
 };
 
@@ -125,14 +129,7 @@ export default function AssessmentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [projectType, setProjectType] = useState<
-    | "new_product"
-    | "new_vendor"
-    | "data_migration"
-    | "marketing_campaign"
-    | "feature_change"
-    | "other"
-  >("feature_change");
+  const [projectType, setProjectType] = useState("feature_change");
 
   const byStatus = stats?.byStatus ?? {};
   const draft = byStatus.draft ?? 0;
@@ -180,17 +177,18 @@ export default function AssessmentsPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs text-slate-500">Project type</label>
-              <select
+              <input
+                list="project-type-suggestions"
                 value={projectType}
-                onChange={(e) => setProjectType(e.target.value as typeof projectType)}
+                onChange={(e) => setProjectType(e.target.value)}
+                placeholder="e.g. DPIA, ROPA, new_vendor, or any custom type"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-              >
+              />
+              <datalist id="project-type-suggestions">
                 {Object.entries(PROJECT_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
+                  <option key={k} value={k}>{v}</option>
                 ))}
-              </select>
+              </datalist>
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-xs text-slate-500">Description (optional)</label>

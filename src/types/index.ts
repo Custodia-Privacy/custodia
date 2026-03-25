@@ -57,6 +57,14 @@ export interface BannerPublicConfig {
   };
 }
 
+/** Agent job payload for BullMQ */
+export interface AgentJobPayload {
+  runId: string;
+  orgId: string;
+  agentType: string;
+  input: Record<string, unknown>;
+}
+
 /** Scan job payload for BullMQ */
 export interface ScanJobPayload {
   scanId: string;

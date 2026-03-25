@@ -39,7 +39,16 @@ const runStatusClasses: Record<string, string> = {
 export default function AgentsPage() {
   const utils = api.useUtils();
   const { data: types } = api.agents.listAgentTypes.useQuery();
-  const { data: runsData, isLoading } = api.agents.listRuns.useQuery({ limit: 50 });
+  const { data: runsData, isLoading } = api.agents.listRuns.useQuery(
+    { limit: 50 },
+    {
+      refetchInterval: (query) => {
+        const items = query.state.data?.items;
+        if (items?.some((r) => r.status === "queued" || r.status === "running")) return 3000;
+        return false;
+      },
+    },
+  );
   const trigger = api.agents.trigger.useMutation({
     onSuccess: () => void utils.agents.listRuns.invalidate(),
   });
@@ -101,6 +110,15 @@ export default function AgentsPage() {
 
       {trigger.error && (
         <p className="mb-4 text-sm text-red-600 dark:text-red-400">{trigger.error.message}</p>
+      )}
+
+      {runs.some((r) => r.status === "queued" || r.status === "running") && (
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-navy-200 bg-navy-50/50 px-4 py-3 dark:border-navy-900 dark:bg-navy-950/30">
+          <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-navy-500" />
+          <p className="text-sm text-navy-700 dark:text-navy-300">
+            Agent runs in progress. This page refreshes automatically.
+          </p>
+        </div>
       )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

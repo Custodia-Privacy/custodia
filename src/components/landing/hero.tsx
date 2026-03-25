@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { api } from "@/lib/trpc";
 
 export function Hero() {
-  const [email, setEmail] = useState("");
+  const [url, setUrl] = useState("");
+  const scan = api.scan.quick.useMutation();
+
+  function handleScan() {
+    const raw = url.trim();
+    if (!raw) return;
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    scan.mutate({ url: normalized });
+  }
 
   return (
     <section className="relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-28">
@@ -36,19 +45,37 @@ export function Hero() {
 
           {/* CTA */}
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <div className="flex w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <form
+              className="flex w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              onSubmit={(e) => { e.preventDefault(); handleScan(); }}
+            >
               <input
-                type="email"
+                type="text"
                 placeholder="Enter your website URL"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
                 className="flex-1 px-4 py-3 text-sm outline-none placeholder:text-slate-400 dark:bg-slate-900 dark:text-white"
               />
-              <button className="bg-navy-950 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-navy-900 dark:bg-navy-600 dark:hover:bg-navy-500">
-                Free Scan
+              <button
+                type="submit"
+                disabled={scan.isPending}
+                className="bg-navy-950 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-navy-900 disabled:opacity-60 dark:bg-navy-600 dark:hover:bg-navy-500"
+              >
+                {scan.isPending ? "Scanning…" : "Free Scan"}
               </button>
-            </div>
+            </form>
           </div>
+          {scan.isSuccess && (
+            <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-50 px-4 py-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              Scan queued! Your privacy report is being generated.
+            </div>
+          )}
+          {scan.error && (
+            <p className="mt-4 text-sm text-red-600 dark:text-red-400">{scan.error.message}</p>
+          )}
           <p className="mt-3 text-xs text-slate-400">
             No credit card required. Get your privacy report in under 60
             seconds.
@@ -116,28 +143,26 @@ export function Hero() {
                 ].map((tracker) => (
                   <div
                     key={tracker.name}
-                    className="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-3 dark:border-slate-800"
+                    className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-slate-100 px-4 py-3 dark:border-slate-800"
                   >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`h-2.5 w-2.5 rounded-full ${
-                          tracker.status === "compliant"
-                            ? "bg-compliant"
-                            : tracker.status === "warning"
-                              ? "bg-warning"
-                              : "bg-violation"
-                        }`}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">
-                          {tracker.name}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {tracker.issue}
-                        </p>
-                      </div>
+                    <div
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                        tracker.status === "compliant"
+                          ? "bg-compliant"
+                          : tracker.status === "warning"
+                            ? "bg-warning"
+                            : "bg-violation"
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
+                        {tracker.name}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {tracker.issue}
+                      </p>
                     </div>
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       {tracker.type}
                     </span>
                   </div>

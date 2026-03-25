@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/trpc";
 
 const REQUEST_LABELS: Record<string, string> = {
@@ -66,6 +67,31 @@ function statusBadge(
   );
 }
 
+function useCopyToClipboard() {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(async (text: string) => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* silently fail */
+    }
+  }, []);
+  return { copy, copied };
+}
+
 export default function DsarsPage() {
   const utils = api.useUtils();
   const { data: sites } = api.site.list.useQuery();
@@ -88,6 +114,7 @@ export default function DsarsPage() {
   const [requesterEmail, setRequesterEmail] = useState("");
   const [publicSiteId, setPublicSiteId] = useState("");
   const [origin, setOrigin] = useState("");
+  const { copy: copyUrl, copied: urlCopied } = useCopyToClipboard();
 
   useEffect(() => {
     setOrigin(typeof window !== "undefined" ? window.location.origin : "");
@@ -101,6 +128,12 @@ export default function DsarsPage() {
 
   const publicFormUrl =
     origin && publicSiteId ? `${origin}/request/${publicSiteId}` : "";
+  const embedUrl =
+    origin && publicSiteId ? `${origin}/embed/dsar/${publicSiteId}` : "";
+  const embedSnippet = embedUrl
+    ? `<iframe src="${embedUrl}" width="100%" height="700" frameborder="0" style="border:none;max-width:560px;"></iframe>`
+    : "";
+  const { copy: copyEmbed, copied: embedCopied } = useCopyToClipboard();
 
   return (
     <div className="p-6 lg:p-8">
@@ -152,11 +185,30 @@ export default function DsarsPage() {
               </code>
               <button
                 type="button"
-                onClick={() => void navigator.clipboard.writeText(publicFormUrl)}
+                onClick={() => void copyUrl(publicFormUrl)}
                 className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:bg-white dark:border-slate-600 dark:hover:bg-slate-900"
               >
-                Copy
+                {urlCopied ? "Copied!" : "Copy"}
               </button>
+            </div>
+          )}
+          {embedSnippet && (
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                Embed on your site
+              </p>
+              <div className="flex flex-wrap items-start gap-2">
+                <code className="block max-w-full break-all rounded bg-white px-2 py-1 text-[11px] dark:bg-slate-900">
+                  {embedSnippet}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => void copyEmbed(embedSnippet)}
+                  className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:bg-white dark:border-slate-600 dark:hover:bg-slate-900"
+                >
+                  {embedCopied ? "Copied!" : "Copy embed"}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -293,13 +345,17 @@ export default function DsarsPage() {
                   return (
                     <tr
                       key={row.id}
-                      className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                      className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50"
                     >
                       <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {row.id.slice(0, 8)}…
+                        <Link href={`/dsars/${row.id}`} className="hover:underline">
+                          {row.id.slice(0, 8)}…
+                        </Link>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900 dark:text-white">
-                        {row.requesterName}
+                        <Link href={`/dsars/${row.id}`}>
+                          {row.requesterName}
+                        </Link>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-600 dark:text-slate-300">
                         {REQUEST_LABELS[row.requestType] ?? row.requestType}

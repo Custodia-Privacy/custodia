@@ -50,23 +50,6 @@ const competitors = [
       setupTime: "Weeks",
     },
   },
-  {
-    name: "Transcend",
-    highlight: false,
-    values: {
-      price: "$10,000+/yr",
-      cookieBanner: true,
-      policyGenerator: false,
-      scanner: true,
-      dataMapping: true,
-      dsar: true,
-      pia: false,
-      consentMode: true,
-      multiJurisdiction: true,
-      aiPowered: false,
-      setupTime: "Weeks",
-    },
-  },
 ];
 
 const featureRows: { key: keyof (typeof competitors)[0]["values"]; label: string }[] = [

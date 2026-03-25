@@ -85,7 +85,7 @@ export function Pricing() {
           {tiers.map((tier) => (
             <div
               key={tier.name}
-              className={`relative rounded-xl border p-6 ${
+              className={`relative flex flex-col rounded-xl border p-6 ${
                 tier.highlighted
                   ? "border-navy-500 bg-navy-950 text-white shadow-xl shadow-navy-950/20 dark:border-navy-400 dark:bg-navy-900"
                   : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
@@ -138,7 +138,7 @@ export function Pricing() {
                 {tier.description}
               </p>
 
-              <ul className="mt-6 space-y-3">
+              <ul className="mt-6 flex-1 space-y-3">
                 {tier.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2">
                     <svg

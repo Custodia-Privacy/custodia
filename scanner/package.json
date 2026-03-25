@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsup src/index.ts --format esm --dts",
-    "start": "node dist/index.js"
+    "dev:agents": "tsx watch src/agent-worker.ts",
+    "build": "tsup src/index.ts src/agent-worker.ts --format esm --dts",
+    "start": "node dist/index.js",
+    "start:agents": "node dist/agent-worker.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

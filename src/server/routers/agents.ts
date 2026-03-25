@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, orgProcedure, publicProcedure } from "../trpc";
+import { enqueueAgent } from "@/lib/queue";
 
 const AGENT_TYPE_DESCRIPTIONS: Record<
   string,
@@ -128,35 +129,20 @@ export const agentsRouter = createRouter({
           trigger: "api",
           status: "queued",
           input: (input.input ?? {}) as any,
-        },
-      });
-
-      const startedAt = new Date();
-      const tokensUsed = estimateTokens(input.agentType);
-      const costCents = Math.ceil(tokensUsed * 0.003);
-
-      const updated = await ctx.db.agentRun.update({
-        where: { id: run.id },
-        data: {
-          status: "completed",
-          startedAt,
-          completedAt: new Date(),
-          tokensUsed,
-          costCents,
-          output: {
-            agentType: input.agentType,
-            message: `${AGENT_TYPE_DESCRIPTIONS[input.agentType]?.name ?? input.agentType} completed successfully.`,
-            processedInput: input.input ?? {},
-          } as any,
           logs: [
-            { ts: startedAt.toISOString(), level: "info", message: "Agent run started" },
-            { ts: new Date().toISOString(), level: "info", message: "Processing input" },
-            { ts: new Date().toISOString(), level: "info", message: "Agent run completed" },
+            { ts: new Date().toISOString(), level: "info", message: "Agent run queued" },
           ] as any,
         },
       });
 
-      return updated;
+      await enqueueAgent({
+        runId: run.id,
+        orgId: ctx.orgId,
+        agentType: input.agentType,
+        input: input.input ?? {},
+      });
+
+      return run;
     }),
 
   /** Cancel a running or queued agent run */
@@ -231,17 +217,3 @@ export const agentsRouter = createRouter({
   }),
 });
 
-function estimateTokens(agentType: string): number {
-  const baseCosts: Record<string, number> = {
-    scanner: 2500,
-    dsar_processor: 4000,
-    policy_generator: 3500,
-    compliance_monitor: 2000,
-    data_mapper: 3000,
-    pia_assessor: 3500,
-    vendor_reviewer: 2500,
-  };
-  const base = baseCosts[agentType] ?? 2000;
-  const jitter = Math.floor(Math.random() * 500);
-  return base + jitter;
-}

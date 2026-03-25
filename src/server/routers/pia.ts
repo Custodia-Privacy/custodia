@@ -97,7 +97,7 @@ export const piaRouter = createRouter({
       z.object({
         title: z.string().min(1).max(500),
         description: z.string().optional(),
-        projectType: z.enum(PROJECT_TYPES),
+        projectType: z.string().min(1).max(100),
       }),
     )
     .mutation(async ({ ctx, input }) => {
