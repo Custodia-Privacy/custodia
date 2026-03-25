@@ -1,577 +1,621 @@
 # Custodia — Architecture Document
 
-**Version:** 1.0
-**Date:** 2026-03-22
+**Version:** 2.0
+**Date:** 2026-03-25
 **Author:** Software Architect
 
 ---
 
 ## 1. Overview
 
-Custodia is a privacy & compliance SaaS for solo founders and SMBs (5–50 people). It provides AI-powered website scanning, smart cookie consent banners, privacy policy generation, a compliance dashboard, and ongoing monitoring — priced at $29–49/month.
+Custodia is an **agent-first** privacy & compliance SaaS platform for solo founders and SMBs. AI agents are the primary users — the web dashboard exists for human monitoring and configuration.
 
+The platform provides: AI-powered website scanning, smart cookie consent banners, privacy policy generation, DSAR automation, privacy impact assessments, data governance, vendor management, preference centers, and ongoing compliance monitoring.
+
+**Production URL:** `https://app.custodia-privacy.com`
 **Domain:** `custodia-privacy.com`
 
 ---
 
-## 2. Tech Stack
+## 2. System Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    AI AGENTS (Users)                      │
+│  Claude, GPT, custom agents, scheduled jobs, webhooks    │
+└───────────────────────┬──────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────┐
+│              MCP SERVER (mcp-server/)                     │
+│  10 tool categories: Sites · Scanner · Consent · Policy  │
+│  DSAR · PIA · Governance · Compliance · Preferences ·    │
+│  Agents                                                  │
+└───────────────────────┬──────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────┐
+│             CUSTODIA API (tRPC + REST)                   │
+│  14 routers: site, scan, banner, policy, billing, user,  │
+│  dsar, pia, governance, preferences, agents, dashboard,  │
+│  org, assistant                                          │
+└───────────────────────┬──────────────────────────────────┘
+                        │
+                ┌───────┼───────┐
+                ▼       ▼       ▼
+           PostgreSQL  Redis   Claude API
+           (Docker)    (Docker)  (Anthropic)
+```
+
+---
+
+## 3. Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Framework | Next.js 16 (App Router) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS 4 |
-| Database | PostgreSQL 16 |
+| Database | PostgreSQL 16 (Docker: `custodia-postgres`, port 5432) |
 | ORM | Prisma 6 |
 | Auth | NextAuth.js v5 (Auth.js) |
 | Payments | Stripe Checkout + Webhooks |
 | Scanner Engine | Playwright (headless Chromium) |
-| AI | Anthropic Claude API (claude-sonnet-4-6) |
-| Queue/Jobs | BullMQ + Redis |
+| AI | Anthropic Claude API |
+| Queue/Jobs | BullMQ + Redis (Docker: `custodia-redis`, port 6380) |
 | Email | Resend |
-| Hosting | Vercel (app) + Railway/Fly.io (scanner worker) |
-| Email | Resend |
-| Hosting | Vercel (app) + Fly.io (scanner worker) |
+| Process Manager | PM2 (process name: `custodia`) |
+| Deployment | PM2 + Cloudflare Tunnel → localhost:3200 |
+| Agent Interface | MCP Server (Model Context Protocol) |
 
 ---
 
-## 3. Project Structure
-
-Single Next.js application with a co-located scanner worker:
+## 4. Project Structure
 
 ```
 custodia/
 ├── ARCHITECTURE.md              # This file
-├── package.json                 # All dependencies
-├── .env.example                 # Environment variable template
-├── .gitignore
-├── eslint.config.mjs
-├── next.config.ts
-├── tsconfig.json
+├── AGENTS.md                    # Agent-first platform docs
+├── CLAUDE.md                    # Claude Code agent instructions
+├── package.json
+├── .env.local                   # Environment (not committed)
 │
 ├── prisma/
-│   └── schema.prisma            # Database schema (Prisma ORM)
+│   ├── schema.prisma            # 22 models across 10 domains
+│   └── seed.ts                  # Database seeding
 │
 ├── src/
 │   ├── app/
-│   │   ├── page.tsx             # Landing page (root)
-│   │   ├── layout.tsx           # Root layout
-│   │   ├── globals.css          # Tailwind + brand colors
-│   │   │
-│   │   ├── (marketing)/         # Public marketing pages
-│   │   │   ├── pricing/page.tsx
-│   │   │   └── layout.tsx
+│   │   ├── (marketing)/         # Public pages
+│   │   │   ├── page.tsx         # Landing page
+│   │   │   ├── pricing/         # Pricing page
+│   │   │   ├── preference-center/[centerId]/  # Public preference center
+│   │   │   └── request/[siteId]/              # Public DSAR request form
 │   │   │
 │   │   ├── (auth)/              # Login, signup
-│   │   │   ├── login/page.tsx
-│   │   │   ├── signup/page.tsx
-│   │   │   └── layout.tsx
+│   │   │   ├── login/
+│   │   │   └── signup/
 │   │   │
-│   │   ├── (dashboard)/         # Authenticated app
-│   │   │   ├── dashboard/page.tsx
-│   │   │   ├── sites/
-│   │   │   │   ├── page.tsx
-│   │   │   │   └── [siteId]/
-│   │   │   │       ├── page.tsx
-│   │   │   │       ├── scans/page.tsx
-│   │   │   │       ├── banner/page.tsx
-│   │   │   │       └── policy/page.tsx
-│   │   │   ├── settings/page.tsx
-│   │   │   └── layout.tsx
+│   │   ├── (dashboard)/         # Authenticated app (14 pages)
+│   │   │   ├── dashboard/       # Overview dashboard
+│   │   │   ├── sites/           # Site management + [siteId]/{scans,banner,policy}
+│   │   │   ├── dsars/           # DSAR list + [requestId] detail
+│   │   │   ├── assessments/     # Privacy Impact Assessments
+│   │   │   ├── data-map/        # Data governance visualization
+│   │   │   ├── vendors/         # Vendor management
+│   │   │   ├── preferences/     # Preference center management
+│   │   │   ├── agents/          # Agent orchestration dashboard
+│   │   │   ├── assistant/       # AI chat assistant
+│   │   │   └── settings/        # User + organization settings
+│   │   │
+│   │   ├── embed/
+│   │   │   └── dsar/[siteId]/   # Embeddable DSAR form
 │   │   │
 │   │   └── api/
-│   │       ├── auth/[...nextauth]/route.ts
-│   │       ├── webhooks/stripe/route.ts
-│   │       ├── trpc/[trpc]/route.ts
-│   │       └── banner/[siteId]/route.ts   # Public banner script
+│   │       ├── auth/[...nextauth]/route.ts    # NextAuth
+│   │       ├── auth/signup/route.ts           # Email/password signup
+│   │       ├── banner/[siteId]/route.ts       # Public banner JS SDK
+│   │       ├── banner/[siteId]/consent/route.ts # Consent logging
+│   │       ├── health/route.ts                # Health check
+│   │       ├── public/dsar/route.ts           # Public DSAR intake
+│   │       ├── public/site/[siteId]/route.ts  # Public site info
+│   │       ├── trpc/[trpc]/route.ts           # tRPC endpoint
+│   │       └── webhooks/stripe/route.ts       # Stripe webhooks
+│   │
+│   ├── agents/                  # Built-in AI agents
+│   │   ├── base.ts              # Base agent class
+│   │   ├── index.ts             # Agent registry
+│   │   ├── scanner-agent.ts     # Site scanning automation
+│   │   ├── dsar-agent.ts        # DSAR processing automation
+│   │   ├── policy-agent.ts      # Policy generation automation
+│   │   └── compliance-agent.ts  # Compliance monitoring automation
 │   │
 │   ├── components/
 │   │   ├── ui/                  # Shared UI primitives
 │   │   ├── landing/             # Landing page sections
+│   │   ├── marketing/           # Marketing components
 │   │   ├── dashboard/           # Dashboard components
 │   │   ├── banner/              # Banner preview/editor
+│   │   ├── dsar-form.tsx        # DSAR intake form
 │   │   ├── navbar.tsx
-│   │   └── footer.tsx
+│   │   ├── footer.tsx
+│   │   └── providers.tsx        # React context providers
 │   │
 │   ├── lib/
 │   │   ├── auth.ts              # NextAuth config
+│   │   ├── db.ts                # Prisma client singleton
 │   │   ├── stripe.ts            # Stripe client + plan config
+│   │   ├── queue.ts             # BullMQ queue setup
+│   │   ├── compliance.ts        # Compliance scoring logic
+│   │   ├── dsar-deadlines.ts    # Jurisdiction-aware deadline calc
+│   │   ├── banner-defaults.ts   # Default banner configs
+│   │   ├── privacy-webhook.ts   # HMAC-signed webhook dispatch
+│   │   ├── public-rate-limit.ts # Rate limiting for public endpoints
+│   │   ├── format-relative.ts   # Date formatting utilities
+│   │   ├── trpc.ts              # Client-side tRPC setup
 │   │   └── utils.ts             # cn(), helpers
 │   │
 │   ├── server/
 │   │   ├── trpc.ts              # tRPC init, context, procedures
-│   │   ├── root.ts              # Root tRPC router
-│   │   └── routers/
+│   │   ├── root.ts              # Root tRPC router (14 routers)
+│   │   └── routers/             # 14 tRPC routers
 │   │       ├── site.ts
 │   │       ├── scan.ts
 │   │       ├── banner.ts
 │   │       ├── policy.ts
 │   │       ├── billing.ts
-│   │       └── user.ts
+│   │       ├── user.ts
+│   │       ├── dsar.ts
+│   │       ├── pia.ts
+│   │       ├── governance.ts
+│   │       ├── preferences.ts
+│   │       ├── agents.ts
+│   │       ├── dashboard.ts
+│   │       ├── org.ts
+│   │       └── assistant.ts
 │   │
 │   ├── types/
-│   │   └── index.ts             # Shared TypeScript types
+│   │   └── index.ts
 │   │
-│   └── proxy.ts                 # Next.js 16 proxy (was middleware)
+│   └── proxy.ts                 # Next.js 16 proxy (replaces middleware)
 │
-└── scanner/                     # Scanner worker (separate deploy)
-    ├── package.json
-    ├── tsconfig.json
-    └── src/
-        ├── index.ts             # BullMQ worker entry point
-        ├── crawler.ts           # Playwright site crawler
-        ├── analyzers/
-        │   ├── cookies.ts       # Cookie classification
-        │   ├── trackers.ts      # Tracker detection
-        │   ├── scripts.ts       # Script analysis
-        │   └── data-collection.ts
-        ├── ai/
-        │   ├── summarizer.ts    # AI scan summary
-        │   └── policy-gen.ts    # AI privacy policy generator
-        └── utils/
-            ├── known-trackers.ts
-            └── cookie-db.ts
+├── scanner/                     # Scanner worker (separate process)
+│   └── src/
+│       ├── index.ts             # BullMQ worker entry point
+│       ├── crawler.ts           # Playwright site crawler
+│       ├── analyzers/           # Cookie, tracker, script analysis
+│       ├── ai/                  # AI summarization + policy gen
+│       └── utils/               # Known trackers DB, cookie DB
+│
+├── mcp-server/                  # MCP Server for AI agent access
+│   └── src/
+│       ├── index.ts             # MCP server entry (stdio transport)
+│       ├── client.ts            # HTTP client for Custodia API
+│       └── tools/               # 10 tool categories
+│           ├── index.ts
+│           ├── sites.ts
+│           ├── scanner.ts
+│           ├── consent.ts
+│           ├── policy.ts
+│           ├── dsar.ts
+│           ├── pia.ts
+│           ├── governance.ts
+│           ├── compliance.ts
+│           ├── preferences.ts
+│           └── agents.ts
+│
+├── e2e/                         # Playwright E2E tests
+├── marketing/                   # Marketing content & blog
+├── public/                      # Static assets
+└── docs/                        # Documentation
 ```
 
 ---
 
-## 4. Database Schema
+## 5. Database Schema
 
-### Entity Relationship Summary
+### 22 Models across 10 Domains
 
 ```
-User 1──* Organization *──* Site 1──* Scan 1──* Finding
-                                   1──1 Banner
-                                   1──1 Policy
-Organization 1──1 Subscription
+Auth:        User, Account, Session, VerificationToken
+Org:         Organization, OrgMember, ApiKey, AuditLog
+Scanning:    Site, Scan, Finding
+Consent:     Banner, ConsentLog
+Policy:      Policy
+Alerts:      Alert
+DSAR:        DsarRequest, DsarActivity
+PIA:         Assessment, AssessmentActivity
+Governance:  DataStore, DataFlow, Vendor
+Preferences: PreferenceCenter, UserPreference
+Agents:      AgentRun
 ```
 
-### Core Tables
+### Entity Relationships
 
-#### users
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| email | varchar(255) | unique, not null |
-| name | varchar(255) | |
-| password_hash | varchar(255) | nullable (OAuth users) |
-| email_verified_at | timestamp | |
-| image | text | avatar URL |
-| created_at | timestamp | default now() |
-| updated_at | timestamp | |
+```
+User 1──* OrgMember *──1 Organization
+Organization 1──* Site 1──* Scan 1──* Finding
+                       1──1 Banner
+                       1──1 Policy
+                       1──* ConsentLog
+                       1──* Alert
+Organization 1──* DsarRequest 1──* DsarActivity
+Organization 1──* Assessment 1──* AssessmentActivity
+Organization 1──* DataStore
+Organization 1──* DataFlow (source→target DataStores)
+Organization 1──* Vendor
+Organization 1──* PreferenceCenter 1──* UserPreference
+Organization 1──* AgentRun
+Organization 1──* ApiKey
+Organization 1──* AuditLog
+User 1──* Assessment (assignee)
+```
 
-#### organizations
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| name | varchar(255) | |
-| slug | varchar(100) | unique |
-| plan | enum | free, starter, pro |
-| stripe_customer_id | varchar(255) | nullable |
-| stripe_subscription_id | varchar(255) | nullable |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+### Key Enums
 
-#### org_members
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| org_id | uuid | FK → organizations |
-| user_id | uuid | FK → users |
-| role | enum | owner, admin, member |
-| created_at | timestamp | |
+| Enum | Values |
+|------|--------|
+| Plan | `free`, `starter`, `growth`, `business` |
+| OrgRole | `owner`, `admin`, `member` |
+| ScanStatus | `queued`, `running`, `completed`, `failed` |
+| ScanType | `full`, `quick`, `monitoring` |
+| FindingCategory | `cookie`, `tracker`, `script`, `data_collection`, `consent`, `policy` |
+| Severity | `critical`, `warning`, `info`, `ok` |
+| DsarType | `access`, `deletion`, `rectification`, `portability`, `opt_out`, `restrict_processing` |
+| DsarStatus | `received`, `identity_verified`, `processing`, `data_collected`, `review`, `fulfilled`, `rejected`, `appealed` |
+| AssessmentStatus | `draft`, `in_progress`, `ai_review`, `human_review`, `approved`, `rejected`, `archived` |
+| RiskLevel | `low`, `medium`, `high`, `critical` |
+| DataStoreType | `database`, `api`, `file_storage`, `saas_app`, `crm`, `analytics`, `email_platform`, `cdn`, `payment_processor`, `other` |
+| DataSensitivity | `public`, `internal`, `confidential`, `restricted`, `pii`, `sensitive_pii` |
+| AgentType | `scanner`, `dsar_processor`, `policy_generator`, `compliance_monitor`, `data_mapper`, `pia_assessor`, `vendor_reviewer` |
+| AlertType | `new_tracker`, `compliance_drop`, `scan_failed`, `policy_outdated`, `dsar_deadline`, `pia_required`, `vendor_risk` |
 
-#### sites
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| org_id | uuid | FK → organizations |
-| domain | varchar(255) | not null |
-| name | varchar(255) | display name |
-| verified | boolean | domain ownership verified |
-| monitoring_enabled | boolean | default true |
-| scan_frequency | enum | daily, weekly, monthly |
-| last_scanned_at | timestamp | nullable |
-| compliance_score | integer | 0–100, nullable |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+---
 
-#### scans
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| site_id | uuid | FK → sites |
-| status | enum | queued, running, completed, failed |
-| scan_type | enum | full, quick, monitoring |
-| pages_crawled | integer | default 0 |
-| started_at | timestamp | nullable |
-| completed_at | timestamp | nullable |
-| summary | jsonb | AI-generated summary |
-| raw_data | jsonb | Full scan data |
-| compliance_scores | jsonb | Per-regulation scores |
-| created_at | timestamp | |
+## 6. API Design (tRPC Routers)
 
-#### findings
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| scan_id | uuid | FK → scans |
-| site_id | uuid | FK → sites |
-| category | enum | cookie, tracker, script, data_collection, consent, policy |
-| severity | enum | critical, warning, info, ok |
-| title | varchar(500) | |
-| description | text | Plain English explanation |
-| recommendation | text | How to fix |
-| details | jsonb | Category-specific data |
-| regulation | varchar(50)[] | Affected regulations (GDPR, CCPA, etc.) |
-| page_url | text | Where found |
-| first_seen_at | timestamp | |
-| last_seen_at | timestamp | |
-| resolved_at | timestamp | nullable |
-| created_at | timestamp | |
+All routes authenticated via NextAuth session unless marked **Public**.
 
-#### banners
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| site_id | uuid | FK → sites, unique |
-| enabled | boolean | default false |
-| config | jsonb | See Banner Config schema below |
-| published_config | jsonb | Last deployed config |
-| published_at | timestamp | nullable |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+### site router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `site.list` | query | All sites in user's org |
+| `site.get` | query | Site with latest scan, banner, policy |
+| `site.create` | mutation | Create site, triggers initial scan |
+| `site.update` | mutation | Update name, monitoring, scan frequency |
+| `site.delete` | mutation | Soft delete |
+| `site.verify` | mutation | DNS/meta tag domain verification |
 
-#### policies
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| site_id | uuid | FK → sites, unique |
-| content_html | text | Rendered policy HTML |
-| content_markdown | text | Policy in markdown |
-| version | integer | Auto-incremented |
-| based_on_scan_id | uuid | FK → scans |
-| generated_at | timestamp | |
-| published_at | timestamp | nullable |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+### scan router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `scan.list` | query | Paginated scans for a site |
+| `scan.get` | query | Scan with findings |
+| `scan.trigger` | mutation | Enqueue scan job |
+| `scan.quick` | mutation | **Public** — free homepage scan for lead gen |
+| `scan.compare` | query | Diff two scans |
 
-#### consent_logs
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| site_id | uuid | FK → sites |
-| visitor_id | varchar(255) | Anonymous hash |
-| ip_country | varchar(2) | ISO country code |
-| jurisdiction | varchar(20) | GDPR, CCPA, etc. |
-| consent_given | jsonb | { necessary: true, analytics: false, ... } |
-| action | enum | accept_all, reject_all, customize, dismiss |
-| user_agent | text | |
-| created_at | timestamp | |
+### banner router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `banner.get` | query | Banner config for site |
+| `banner.update` | mutation | Update banner config |
+| `banner.publish` | mutation | Deploy banner |
+| `banner.preview` | query | Preview HTML/CSS/JS |
 
-#### alerts
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| site_id | uuid | FK → sites |
-| org_id | uuid | FK → organizations |
-| type | enum | new_tracker, compliance_drop, scan_failed, policy_outdated |
-| title | varchar(500) | |
-| message | text | |
-| severity | enum | critical, warning, info |
-| read_at | timestamp | nullable |
-| created_at | timestamp | |
+### policy router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `policy.get` | query | Current policy |
+| `policy.generate` | mutation | AI-generate from scan data |
+| `policy.update` | mutation | Manual edits |
+| `policy.publish` | mutation | Publish policy |
+| `policy.versions` | query | Version history |
 
-### Banner Config JSON Schema
+### billing router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `billing.getSubscription` | query | Current subscription |
+| `billing.createCheckout` | mutation | Stripe Checkout URL |
+| `billing.createPortal` | mutation | Stripe Customer Portal URL |
+| `billing.usage` | query | Usage stats vs plan limits |
+
+### user router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `user.me` | query | Current user + org |
+| `user.update` | mutation | Update profile |
+| `user.inviteTeamMember` | mutation | Send team invite |
+| `user.listTeamMembers` | query | Org members |
+
+### dsar router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `dsar.list` | query | DSARs with status filter |
+| `dsar.get` | query | DSAR details + activity log |
+| `dsar.create` | mutation | Create DSAR (auto-calculates deadline) |
+| `dsar.process` | mutation | AI-process (find data, generate response) |
+| `dsar.fulfill` | mutation | Mark fulfilled |
+| `dsar.reject` | mutation | Reject with reason |
+| `dsar.submitPortal` | mutation | **Public** intake endpoint |
+
+### pia router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `pia.create` | mutation | New privacy impact assessment |
+| `pia.generateQuestions` | mutation | AI-generate questions for project type |
+| `pia.submitAnswers` | mutation | Record answers |
+| `pia.analyze` | mutation | AI risk analysis + report |
+| `pia.approve` / `pia.reject` | mutation | Review workflow |
+
+### governance router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `governance.createStore` | mutation | Register data store |
+| `governance.classifyStore` | mutation | AI-classify data |
+| `governance.mapFlows` | mutation | AI-discover data flows |
+| `governance.createVendor` | mutation | Add vendor |
+| `governance.reviewVendor` | mutation | AI vendor review |
+
+### preferences router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `preferences.createCenter` | mutation | Create preference center |
+| `preferences.getPreferences` | query | User preferences |
+| `preferences.updatePreferences` | mutation | **Public** preference update |
+
+### agents router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `agents.trigger` | mutation | Trigger agent by type |
+| `agents.listRuns` | query | Agent run history |
+| `agents.stats` | query | Agent usage statistics |
+
+### dashboard router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `dashboard.overview` | query | Aggregated dashboard stats |
+
+### org router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `org.get` | query | Organization details |
+| `org.update` | mutation | Update org settings |
+
+### assistant router
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `assistant.chat` | mutation | AI chat for compliance Q&A |
+
+---
+
+## 7. MCP Server
+
+The MCP server at `mcp-server/` exposes every Custodia operation as a tool for AI agents.
+
+### Configuration
 
 ```json
 {
-  "position": "bottom" | "bottom-left" | "bottom-right" | "center",
-  "theme": "light" | "dark" | "auto",
-  "primaryColor": "#4F46E5",
-  "showLogo": true,
-  "customCss": "",
-  "content": {
-    "title": "We value your privacy",
-    "description": "We use cookies to enhance your browsing experience...",
-    "acceptAllText": "Accept All",
-    "rejectAllText": "Reject All",
-    "customizeText": "Customize",
-    "privacyPolicyUrl": "/privacy"
-  },
-  "categories": [
-    {
-      "key": "necessary",
-      "name": "Necessary",
-      "description": "Essential for the website to function",
-      "required": true,
-      "cookies": ["session_id", "csrf_token"]
-    },
-    {
-      "key": "analytics",
-      "name": "Analytics",
-      "description": "Help us understand how visitors interact",
-      "required": false,
-      "cookies": ["_ga", "_gid"]
+  "mcpServers": {
+    "custodia": {
+      "command": "npx",
+      "args": ["tsx", "mcp-server/src/index.ts"],
+      "env": {
+        "CUSTODIA_API_URL": "http://localhost:3000",
+        "CUSTODIA_API_KEY": "your-api-key"
+      }
     }
-  ],
-  "regulations": {
-    "gdpr": { "enabled": true, "mode": "opt-in" },
-    "ccpa": { "enabled": true, "mode": "opt-out" }
   }
 }
 ```
 
----
+### Tool Categories (10)
 
-## 5. API Design (tRPC Routers)
-
-We use tRPC for type-safe API communication. All routes are authenticated unless noted.
-
-### site router
-
-| Procedure | Type | Input | Output | Notes |
-|-----------|------|-------|--------|-------|
-| `site.list` | query | — | `Site[]` | All sites in user's org |
-| `site.get` | query | `{ siteId }` | `Site & { latestScan, banner, policy }` | |
-| `site.create` | mutation | `{ domain, name }` | `Site` | Triggers initial scan |
-| `site.update` | mutation | `{ siteId, name?, monitoring?, scanFrequency? }` | `Site` | |
-| `site.delete` | mutation | `{ siteId }` | `void` | Soft delete |
-| `site.verify` | mutation | `{ siteId }` | `{ verified, method }` | DNS/meta tag verification |
-
-### scan router
-
-| Procedure | Type | Input | Output | Notes |
-|-----------|------|-------|--------|-------|
-| `scan.list` | query | `{ siteId, limit?, cursor? }` | `Scan[]` | Paginated |
-| `scan.get` | query | `{ scanId }` | `Scan & { findings[] }` | |
-| `scan.trigger` | mutation | `{ siteId, type? }` | `Scan` | Enqueues scan job |
-| `scan.quick` | mutation | `{ url }` | `QuickScanResult` | **Public** — free scan for lead gen |
-| `scan.compare` | query | `{ scanId1, scanId2 }` | `ScanDiff` | Compare two scans |
-
-### banner router
-
-| Procedure | Type | Input | Output | Notes |
-|-----------|------|-------|--------|-------|
-| `banner.get` | query | `{ siteId }` | `Banner` | |
-| `banner.update` | mutation | `{ siteId, config }` | `Banner` | |
-| `banner.publish` | mutation | `{ siteId }` | `Banner` | Deploys config |
-| `banner.preview` | query | `{ siteId }` | `{ html, css, js }` | Preview snippet |
-
-### policy router
-
-| Procedure | Type | Input | Output | Notes |
-|-----------|------|-------|--------|-------|
-| `policy.get` | query | `{ siteId }` | `Policy` | |
-| `policy.generate` | mutation | `{ siteId }` | `Policy` | AI generates from scan |
-| `policy.update` | mutation | `{ siteId, contentMarkdown }` | `Policy` | Manual edits |
-| `policy.publish` | mutation | `{ siteId }` | `Policy` | |
-| `policy.versions` | query | `{ siteId }` | `PolicyVersion[]` | Version history |
-
-### billing router
-
-| Procedure | Type | Input | Output | Notes |
-|-----------|------|-------|--------|-------|
-| `billing.getSubscription` | query | — | `Subscription` | |
-| `billing.createCheckout` | mutation | `{ plan }` | `{ url }` | Stripe Checkout URL |
-| `billing.createPortal` | mutation | — | `{ url }` | Stripe Customer Portal |
-| `billing.usage` | query | — | `{ sites, scans, limits }` | |
-
-### user router
-
-| Procedure | Type | Input | Output | Notes |
-|-----------|------|-------|--------|-------|
-| `user.me` | query | — | `User & { org }` | |
-| `user.update` | mutation | `{ name?, email? }` | `User` | |
-| `user.inviteTeamMember` | mutation | `{ email, role }` | `void` | |
-| `user.listTeamMembers` | query | — | `OrgMember[]` | |
+| Category | File | Description |
+|----------|------|-------------|
+| Sites | `sites.ts` | `list_sites`, `add_site`, `get_site` |
+| Scanner | `scanner.ts` | `scan_site`, `get_scan_results`, `list_findings` |
+| Consent | `consent.ts` | `get_banner_config`, `update_banner`, `get_consent_stats` |
+| Policy | `policy.ts` | `generate_policy`, `get_policy`, `publish_policy` |
+| DSAR | `dsar.ts` | `list_dsars`, `get_dsar`, `process_dsar`, `fulfill_dsar` |
+| PIA | `pia.ts` | `create_pia`, `generate_pia_questions`, `analyze_pia` |
+| Governance | `governance.ts` | `list_data_stores`, `classify_data`, `map_data_flows`, `review_vendor` |
+| Compliance | `compliance.ts` | `get_compliance_scores`, `get_alerts`, `get_recommendations` |
+| Preferences | `preferences.ts` | `get_preference_center`, `update_user_preferences` |
+| Agents | `agents.ts` | `trigger_agent`, `get_agent_status`, `list_agent_runs` |
 
 ---
 
-## 6. Scanner Architecture
+## 8. Built-in AI Agents
 
-The scanner runs as a **separate worker process** (not in Vercel) because headless browser crawling is long-running and resource-intensive.
+Located at `src/agents/`, these autonomous agents can be triggered via the API or MCP server.
 
-### Flow
+| Agent | Type | Description |
+|-------|------|-------------|
+| Scanner | `scanner` | Crawls sites, detects trackers/cookies, creates alerts for changes |
+| DSAR Processor | `dsar_processor` | Analyzes DSAR, finds data across stores, generates response package |
+| Policy Generator | `policy_generator` | Analyzes scan results, generates/updates privacy policy, flags gaps |
+| Compliance Monitor | `compliance_monitor` | Reviews compliance posture, checks overdue DSARs, generates report |
+
+Each agent extends the base class at `src/agents/base.ts` and is registered in `src/agents/index.ts`.
+
+---
+
+## 9. Scanner Architecture
+
+The scanner runs as a **separate worker process** because headless browser crawling is long-running.
 
 ```
-[User triggers scan] → [tRPC mutation] → [BullMQ job enqueued]
+[User triggers scan] → [tRPC mutation] → [BullMQ job enqueued (Redis)]
                                                   ↓
                                          [Scanner Worker]
                                                   ↓
-                                    ┌─────────────────────────┐
-                                    │  1. Launch Playwright    │
-                                    │  2. Navigate to site     │
-                                    │  3. Crawl pages (max 50) │
-                                    │  4. For each page:       │
-                                    │     - Capture cookies     │
-                                    │     - Detect trackers     │
-                                    │     - Analyze scripts     │
-                                    │     - Find forms/inputs   │
-                                    │  5. AI summarization      │
-                                    │  6. Compliance scoring    │
-                                    │  7. Save results to DB    │
-                                    │  8. Generate findings     │
-                                    └─────────────────────────┘
-                                                  ↓
-                                    [WebSocket/polling update to client]
+                                    1. Launch Playwright
+                                    2. Navigate to site
+                                    3. Crawl pages (max 50)
+                                    4. Per page: cookies, trackers, scripts, forms
+                                    5. AI summarization (Claude)
+                                    6. Compliance scoring
+                                    7. Save results to PostgreSQL
+                                    8. Generate findings + alerts
 ```
-
-### Compliance Scoring
-
-Each regulation gets a 0–100 score based on weighted findings:
-
-| Regulation | Key Checks |
-|-----------|-----------|
-| GDPR | Cookie consent before tracking, policy exists, legal basis documented, data processor list |
-| CCPA | "Do not sell" link present, opt-out mechanism, policy includes CCPA disclosures |
-| State Laws | Varies — mapped from a regulations database |
-
-Overall score = weighted average across applicable regulations.
 
 ### Quick Scan (Public / Lead Gen)
-
-A lightweight scan that:
-- Crawls only the homepage
+- Crawls homepage only
 - Identifies cookies and trackers
-- Returns a summary with 3–5 key findings
-- Requires email to see full results → lead capture
+- Returns 3–5 key findings
+- Requires email for full results → lead capture
 
 ---
 
-## 7. Banner SDK Architecture
+## 10. Banner SDK Architecture
 
-The consent banner is delivered as a lightweight JavaScript bundle (~15KB gzipped) loaded via a `<script>` tag.
+Lightweight JS bundle (~15KB gzipped) served from `/api/banner/[siteId]`:
 
 ```html
-<script src="https://custodia-privacy.com/api/banner/SITE_ID" async></script>
+<script src="https://app.custodia-privacy.com/api/banner/SITE_ID" async></script>
 ```
 
-### Behavior
-
-1. Fetches banner config + cookie categories from API (cached at edge)
-2. Detects visitor jurisdiction via IP geolocation (Cloudflare headers or MaxMind)
+1. Fetches banner config + cookie categories (edge-cached)
+2. Detects jurisdiction via IP geolocation (Cloudflare headers)
 3. Checks existing consent cookie
-4. If no consent: renders banner per jurisdiction rules
-   - GDPR visitors: opt-in (block trackers until consent)
-   - CCPA visitors: opt-out (allow tracking, show "Do Not Sell" link)
-5. On user action: stores consent, fires callback to enable/disable cookie categories
-6. Logs consent event to Custodia API
+4. GDPR: opt-in (block until consent) / CCPA: opt-out (allow, show "Do Not Sell")
+5. Logs consent event to `/api/banner/[siteId]/consent`
 
 ---
 
-## 8. Authentication & Authorization
+## 11. Authentication & Authorization
 
-- **NextAuth.js v5** with email/password + Google OAuth + GitHub OAuth
-- Sessions stored as JWTs (for Vercel edge compatibility)
-- Organization-based access control: users belong to an org, sites belong to an org
+- **NextAuth.js v5** — email/password + Google OAuth + GitHub OAuth
+- JWT sessions for edge compatibility
+- Organization-based multi-tenancy: all resources scoped to org
 - Role-based: `owner` > `admin` > `member`
-- API routes check org membership via tRPC middleware
+- tRPC middleware checks org membership
+- API keys for MCP server / agent auth (hashed, scoped, revocable)
+- Audit log tracks all agent/assistant actions
 
 ---
 
-## 9. Background Jobs (BullMQ)
+## 12. Background Jobs (BullMQ)
 
-| Queue | Job | Schedule |
-|-------|-----|----------|
+| Queue | Job | Trigger |
+|-------|-----|---------|
 | `scan` | Full site scan | On-demand + scheduled |
 | `scan` | Quick scan | On-demand (public) |
-| `monitoring` | Weekly monitoring scan | Cron: `0 3 * * 1` |
-| `policy` | Regenerate policy after scan | After scan completion |
-| `alerts` | Check compliance changes | After scan completion |
-| `email` | Send alert emails | After alert creation |
+| `monitoring` | Monitoring scan | Cron: `0 3 * * 1` (weekly) |
+| `policy` | Regenerate policy | After scan completion |
+| `alerts` | Check compliance | After scan completion |
+| `email` | Send notifications | After alert creation |
 
 ---
 
-## 10. Pricing & Plan Limits
+## 13. Pricing & Plan Limits
 
-| Feature | Free | Starter ($29/mo) | Pro ($49/mo) |
-|---------|------|-------------------|--------------|
-| Sites | 1 | 1 | 5 |
-| Scans/month | 1 (quick only) | 10 full | 50 full |
-| Cookie banner | No | Yes | Yes |
-| Privacy policy | Preview only | Yes | Yes |
-| Monitoring | No | Weekly | Daily |
-| Team members | 1 | 3 | 10 |
-| Consent log retention | — | 90 days | 1 year |
-| Support | Community | Email | Priority |
+| Feature | Free | Starter ($29/mo) | Growth ($49/mo) | Business ($99/mo) |
+|---------|------|-------------------|-----------------|-------------------|
+| Sites | 1 | 3 | 10 | Unlimited |
+| Scans/month | 1 (quick) | 10 full | 50 full | Unlimited |
+| Cookie banner | No | Yes | Yes | Yes |
+| Privacy policy | Preview | Yes | Yes | Yes |
+| Monitoring | No | Weekly | Daily | Real-time |
+| DSAR management | No | Basic | Full + AI | Full + AI |
+| PIAs | No | No | Yes | Yes |
+| Data governance | No | No | Basic | Full |
+| Team members | 1 | 3 | 10 | Unlimited |
+| MCP/API access | No | No | Yes | Yes |
 
 ---
 
-## 11. Environment Variables
-
-See `.env.example` for the full list. Key variables:
+## 14. Deployment Architecture
 
 ```
+                    ┌──────────────────┐
+                    │  Cloudflare      │
+                    │  Tunnel          │
+                    │  (custodia-      │
+                    │   privacy.com)   │
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼─────────┐
+                    │  PM2 (custodia)  │
+                    │  Next.js 16      │
+                    │  localhost:3200   │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+     ┌────────▼──┐  ┌───────▼────┐  ┌──────▼───────┐
+     │ PostgreSQL │  │   Redis    │  │ Claude API   │
+     │ Docker     │  │  Docker    │  │ (Anthropic)  │
+     │ port 5432  │  │  port 6380 │  │              │
+     └────────────┘  └────────────┘  └──────────────┘
+```
+
+---
+
+## 15. Public Endpoints (No Auth)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/banner/[siteId]` | GET | Consent banner JS |
+| `/api/banner/[siteId]/consent` | POST | Log consent event |
+| `/api/public/dsar` | POST | Public DSAR intake |
+| `/api/public/site/[siteId]` | GET | Public site info |
+| `/request/[siteId]` | GET | Public DSAR request form page |
+| `/embed/dsar/[siteId]` | GET | Embeddable DSAR form |
+| `/preference-center/[centerId]` | GET | Public preference center |
+
+---
+
+## 16. Environment Variables
+
+See `.env.local` (not committed). Key variables:
+
+```bash
 # Database
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql://custodia:password@localhost:5432/custodia
+
+# Redis
+REDIS_URL=redis://localhost:6380
 
 # Auth
 NEXTAUTH_SECRET=
-NEXTAUTH_URL=http://localhost:3000
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
+NEXTAUTH_URL=https://app.custodia-privacy.com
 
 # Stripe
 STRIPE_SECRET_KEY=
+STRIPE_PUBLISHABLE_KEY=
 STRIPE_WEBHOOK_SECRET=
-STRIPE_STARTER_PRICE_ID=
-STRIPE_PRO_PRICE_ID=
 
 # AI
 ANTHROPIC_API_KEY=
 
-# Scanner
-REDIS_URL=redis://localhost:6379
-
 # Email
 RESEND_API_KEY=
-
-# Geolocation
-MAXMIND_LICENSE_KEY=
 ```
 
 ---
 
-## 12. Deployment Architecture
+## 17. Key Design Decisions
 
-```
-                    ┌──────────────┐
-                    │   Vercel     │
-                    │  (Next.js)   │
-                    │  Web + API   │
-                    └──────┬───────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-     ┌────────▼──┐  ┌──────▼───┐  ┌────▼─────┐
-     │ PostgreSQL │  │  Redis   │  │ Scanner  │
-     │ (Neon/     │  │ (Upstash │  │ Worker   │
-     │  Supabase) │  │  /Redis) │  │ (Fly.io) │
-     └────────────┘  └──────────┘  └──────────┘
-```
+1. **Agent-first architecture**: AI agents are primary users. MCP server exposes all operations as tools. Dashboard is secondary.
 
-- **Vercel**: Next.js app (web + API + tRPC + Stripe webhooks)
-- **PostgreSQL**: Neon (serverless) or Supabase
-- **Redis**: Upstash (serverless) for BullMQ job queue
-- **Scanner Worker**: Fly.io or Railway (needs persistent process for Playwright)
+2. **tRPC over REST**: Full type safety between frontend and backend. 14 routers cover all domains.
 
----
+3. **Separate scanner worker**: Playwright requires persistent process with Chrome. BullMQ provides reliable job processing with retries.
 
-## 13. Key Design Decisions
+4. **Organization-based multi-tenancy**: Every resource scoped to org. Supports team collaboration.
 
-1. **tRPC over REST**: Full type safety between frontend and backend, auto-generated types, no OpenAPI spec maintenance needed.
+5. **Single Next.js app**: Web, API, and tRPC all in one deployment. Scanner and MCP server are co-located but separately runnable.
 
-2. **Separate scanner worker**: Playwright requires a real server with Chrome — can't run in Vercel serverless. BullMQ provides reliable job processing with retries.
+6. **JSONB for flexible data**: Scan results, banner config, AI analysis results use JSONB — schema evolves without migrations.
 
-3. **Organization-based multi-tenancy**: Supports team collaboration from day 1. Every resource is scoped to an org, not a user.
+7. **Audit trail**: AuditLog model + DsarActivity + AssessmentActivity provide complete compliance audit trail.
 
-4. **Single app, co-located scanner**: MVP uses a single Next.js app with the scanner as a sibling directory (separate deploy). Types are shared via relative imports. Can evolve to a Turborepo monorepo if complexity warrants it.
+8. **API keys for agents**: Hashed, scoped, revocable API keys for MCP server and external agent auth.
 
-5. **Banner served as API route**: The consent banner JS is served from `/api/banner/[siteId]` with edge caching. No React dependency — vanilla JS (~15KB) for minimal impact on customer sites.
+9. **Privacy webhooks**: Sites and preference centers can configure HMAC-signed webhook URLs for real-time event notification.
 
-6. **JSONB for flexible data**: Scan results, banner config, and finding details use JSONB columns — schema evolves without migrations for scanner output format changes.
-
-7. **Next.js 16 specifics**: `params` and `searchParams` are Promises (must `await`). Proxy replaces middleware (`src/proxy.ts`). Turbopack is default. `next lint` removed — use ESLint directly.
+10. **Next.js 16 specifics**: `params` and `searchParams` are Promises (must `await`). Proxy replaces middleware (`src/proxy.ts`). Turbopack is default.
