@@ -35,7 +35,7 @@ Here's how it works:
 
 Plans start at **$29/month**. The full compliance stack — consent management, privacy policy, compliance monitoring, DSAR handling, data governance — without the enterprise price tag.
 
-**[Scan your website free →](https://privacy.pagebolt.dev)**
+**[Scan your website free →](https://app.custodia-privacy.com)**
 
 No signup. No credit card. Just paste your URL and see what's really happening.
 

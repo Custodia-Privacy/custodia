@@ -218,7 +218,7 @@ Everything stays in sync without manual effort.
 
 Custodia Starter includes full consent management at $29/month. One site, consent banner, privacy policy, compliance dashboard, and weekly scans. No per-page-view pricing. No hidden tiers for essential features.
 
-**[Scan your website free →](https://privacy.pagebolt.dev)**
+**[Scan your website free →](https://app.custodia-privacy.com)**
 
 See every cookie and tracker on your site in 60 seconds. No signup required.
 

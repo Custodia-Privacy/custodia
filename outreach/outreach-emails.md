@@ -25,7 +25,7 @@ A few talking points that might resonate with your audience:
 
 I can also speak to the technical architecture if your audience is developer-focused — we've built an MCP server with 40+ privacy compliance tools.
 
-Happy to adjust the angle to fit your show. Here's our site: https://privacy.pagebolt.dev
+Happy to adjust the angle to fit your show. Here's our site: https://app.custodia-privacy.com
 
 Best,
 [Name]
@@ -74,7 +74,7 @@ Hi [Name],
 
 Quick pitch for [Newsletter Name]:
 
-**Custodia** (https://privacy.pagebolt.dev) is an AI-first privacy compliance platform built for SMBs. Instead of a traditional dashboard, it uses AI agents via MCP (Model Context Protocol) to:
+**Custodia** (https://app.custodia-privacy.com) is an AI-first privacy compliance platform built for SMBs. Instead of a traditional dashboard, it uses AI agents via MCP (Model Context Protocol) to:
 
 - Scan sites for compliance issues
 - Generate privacy policies from actual scan data
@@ -120,7 +120,7 @@ Would you be open to a 15-minute call to explore this?
 
 Best,
 [Name]
-Custodia — https://privacy.pagebolt.dev
+Custodia — https://app.custodia-privacy.com
 
 ---
 
@@ -153,7 +153,7 @@ Interested in a quick demo?
 
 Best,
 [Name]
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com
 
 ---
 
@@ -177,4 +177,4 @@ Happy to provide a review account and answer any questions.
 
 Best,
 [Name]
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com

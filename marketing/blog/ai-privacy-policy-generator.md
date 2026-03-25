@@ -140,7 +140,7 @@ Custodia takes the approach described above and integrates it into a complete pr
 
 The result: a privacy policy that's always accurate, always current, and always compliant — without you lifting a finger after initial setup.
 
-**[Try it free — scan your website now →](https://privacy.pagebolt.dev)**
+**[Try it free — scan your website now →](https://app.custodia-privacy.com)**
 
 See what your site is actually collecting. No signup required.
 

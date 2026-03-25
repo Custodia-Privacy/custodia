@@ -21,7 +21,7 @@ I ended up building a tool that uses AI agents to handle the full privacy compli
 - **Handles data subject access requests** — the AI finds relevant data across your systems and drafts response letters
 - **Runs privacy impact assessments** when you add new features
 
-It's called [Custodia](https://privacy.pagebolt.dev) and it's built specifically for small businesses who don't have a legal team or a DPO.
+It's called [Custodia](https://app.custodia-privacy.com) and it's built specifically for small businesses who don't have a legal team or a DPO.
 
 Happy to answer questions about GDPR compliance in general — I've learned way more about it than I ever wanted to. What are the biggest privacy compliance challenges you're facing?
 
@@ -55,7 +55,7 @@ We built an agent-based system at Custodia that automates most of this:
 
 The key insight is that most DSARs follow predictable patterns. An AI agent can handle 80% of the work, and a human just needs to review the output.
 
-We're offering this as part of [Custodia](https://privacy.pagebolt.dev), an AI-first privacy compliance platform for SMBs.
+We're offering this as part of [Custodia](https://app.custodia-privacy.com), an AI-first privacy compliance platform for SMBs.
 
 Anyone else dealing with DSAR volume? What's your current process?
 
@@ -93,7 +93,7 @@ The MCP server means any AI assistant (Claude, GPT, custom agents) can handle pr
 
 The dashboard still exists for monitoring and configuration, but the agents do the heavy lifting.
 
-Check it out: [https://privacy.pagebolt.dev](https://privacy.pagebolt.dev)
+Check it out: [https://app.custodia-privacy.com](https://app.custodia-privacy.com)
 
 Would love feedback on the agent-first approach. Anyone else building MCP servers for compliance/legal use cases?
 
@@ -124,7 +124,7 @@ Instead of giving you a dashboard with 100 settings to configure, we use AI agen
 
 **Price point:** Built to be accessible for bootstrapped businesses and SMBs.
 
-We're just launching and looking for early users who want to get compliant without the enterprise price tag: [https://privacy.pagebolt.dev](https://privacy.pagebolt.dev)
+We're just launching and looking for early users who want to get compliant without the enterprise price tag: [https://app.custodia-privacy.com](https://app.custodia-privacy.com)
 
 What's your current approach to privacy compliance? Are you just ignoring it and hoping for the best? (No judgment — that was us too.)
 
@@ -152,7 +152,7 @@ What's your current approach to privacy compliance? Are you just ignoring it and
 
 **Ask:** Looking for early users and feedback. If you're a startup dealing with GDPR/CCPA compliance, we'd love to help.
 
-[https://privacy.pagebolt.dev](https://privacy.pagebolt.dev)
+[https://app.custodia-privacy.com](https://app.custodia-privacy.com)
 
 ---
 
@@ -176,7 +176,7 @@ Stack: Next.js, tRPC, Prisma, PostgreSQL, Redis, Claude API
 
 The key insight: privacy compliance is repetitive, judgment-heavy, and multi-source — a perfect fit for AI agents. Most SMBs can't afford a DPO or enterprise compliance tools. Custodia fills that gap.
 
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com
 
 ---
 
@@ -196,4 +196,4 @@ Hey IH! Sharing a milestone — we're launching Custodia today.
 
 **Looking for:** Early users, feedback, and fellow founders dealing with compliance pain.
 
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com

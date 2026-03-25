@@ -2,7 +2,7 @@
 
 ## Pre-Launch (Day Before)
 
-- [ ] Verify https://privacy.pagebolt.dev is live and stable
+- [ ] Verify https://app.custodia-privacy.com is live and stable
 - [ ] Test free scan flow end-to-end
 - [ ] Test signup and payment flow
 - [ ] Prepare all social media posts (draft, don't publish)

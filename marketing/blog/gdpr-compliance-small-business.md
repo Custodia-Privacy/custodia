@@ -188,7 +188,7 @@ Custodia is an AI-powered privacy compliance platform built specifically for sma
 
 Plans start at $29/month — a fraction of what a privacy consultant would charge for a single audit.
 
-**[Scan your website free →](https://privacy.pagebolt.dev)**
+**[Scan your website free →](https://app.custodia-privacy.com)**
 
 No signup required. See exactly what your website is collecting in 60 seconds.
 

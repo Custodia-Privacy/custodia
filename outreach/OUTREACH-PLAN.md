@@ -1,7 +1,7 @@
 # Custodia Outreach & Distribution Plan
 
 **Product:** Custodia — AI-Powered Privacy Compliance Platform
-**URL:** https://privacy.pagebolt.dev
+**URL:** https://app.custodia-privacy.com
 **Goal:** Acquire first customers (SMBs needing privacy compliance)
 **Date:** 2026-03-24
 

@@ -33,7 +33,7 @@ Templates for different audience segments, ready to use with Resend API.
   </ul>
 
   <div style="text-align: center; margin: 30px 0;">
-    <a href="https://privacy.pagebolt.dev" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Get Started Free</a>
+    <a href="https://app.custodia-privacy.com" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Get Started Free</a>
   </div>
 
   <p style="color: #333; font-size: 16px; line-height: 1.6;">
@@ -42,7 +42,7 @@ Templates for different audience segments, ready to use with Resend API.
 
   <p style="color: #666; font-size: 14px;">
     — The Custodia Team<br>
-    <a href="https://privacy.pagebolt.dev" style="color: #6366f1;">privacy.pagebolt.dev</a>
+    <a href="https://app.custodia-privacy.com" style="color: #6366f1;">app.custodia-privacy.com</a>
   </p>
 
 </div>
@@ -77,7 +77,7 @@ Templates for different audience segments, ready to use with Resend API.
   </div>
 
   <div style="text-align: center; margin: 30px 0;">
-    <a href="https://privacy.pagebolt.dev" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: 600;">Explore Custodia</a>
+    <a href="https://app.custodia-privacy.com" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: 600;">Explore Custodia</a>
   </div>
 
   <p style="color: #666; font-size: 13px;">
@@ -121,7 +121,7 @@ Templates for different audience segments, ready to use with Resend API.
   </p>
 
   <div style="text-align: center; margin: 30px 0;">
-    <a href="https://privacy.pagebolt.dev" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Scan Your Site Free</a>
+    <a href="https://app.custodia-privacy.com" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Scan Your Site Free</a>
   </div>
 
   <p style="color: #333; font-size: 16px; line-height: 1.6;">
@@ -180,7 +180,7 @@ Templates for different audience segments, ready to use with Resend API.
   </ul>
 
   <div style="text-align: center; margin: 30px 0;">
-    <a href="https://privacy.pagebolt.dev" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Learn More</a>
+    <a href="https://app.custodia-privacy.com" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Learn More</a>
   </div>
 
   <p style="color: #666; font-size: 14px;">
@@ -208,7 +208,7 @@ If timing isn't right, no worries at all. But if privacy compliance is on your r
 
 Here's a 30-second overview: Custodia scans your site for compliance issues and uses AI agents to fix them — privacy policies, cookie consent, data requests, the works.
 
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com
 
 Happy to answer any questions.
 

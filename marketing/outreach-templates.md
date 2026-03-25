@@ -17,7 +17,7 @@ You paste in your website URL, and it crawls your site like a real visitor — d
 - Which privacy regulations apply to you
 - Specific gaps in your compliance
 
-No signup needed, takes about 60 seconds: https://privacy.pagebolt.dev
+No signup needed, takes about 60 seconds: https://app.custodia-privacy.com
 
 The reason I built this: I kept meeting small business owners who'd been quoted $5K-$15K by privacy consultants just to figure out where they stood. That felt wrong. The scan should be free.
 
@@ -43,7 +43,7 @@ Our scanner crawls your website in a headless browser and detects:
 
 It then classifies each finding by purpose, maps the data flows, and shows you where you stand against GDPR requirements.
 
-The scan is free, no signup: https://privacy.pagebolt.dev
+The scan is free, no signup: https://app.custodia-privacy.com
 
 For the privacy professionals here: I'd love your feedback on accuracy and what we might be missing. We're continuously improving the classification engine and want to make sure it meets the standards this community expects.
 
@@ -68,7 +68,7 @@ Hey r/startups — launching Custodia today and wanted to share here because thi
 
 **Pricing:** Free scan → $29/mo Starter → $79/mo Growth → $149/mo Business
 
-Try the free scan (no signup): https://privacy.pagebolt.dev
+Try the free scan (no signup): https://app.custodia-privacy.com
 
 Happy to answer questions about the technical approach, pricing decisions, or how we validated the market.
 
@@ -91,7 +91,7 @@ Technical details:
 - Google Consent Mode v2 integration
 - tRPC API with MCP server for AI agent integration
 
-Free scan (no signup): https://privacy.pagebolt.dev
+Free scan (no signup): https://app.custodia-privacy.com
 
 Pricing: $29/mo for 1 site, $79/mo for 3, $149/mo for 10.
 
@@ -125,7 +125,7 @@ I kept running into the same problem: small businesses that needed GDPR/CCPA com
 **Current status:**
 Launched today. Product is live. Looking for early users and feedback.
 
-Try it: https://privacy.pagebolt.dev
+Try it: https://app.custodia-privacy.com
 
 ---
 
@@ -143,7 +143,7 @@ We just launched an AI-powered privacy compliance platform built for small busin
 
 Custodia fills the gap — AI scans your website, finds every tracker, and builds your full compliance stack (consent banner, privacy policy, dashboard, DSAR management) for $29/month.
 
-The free scan takes 60 seconds with no signup: https://privacy.pagebolt.dev
+The free scan takes 60 seconds with no signup: https://app.custodia-privacy.com
 
 Happy to provide a demo, share our approach, or write a guest piece on privacy compliance for your audience.
 
@@ -162,7 +162,7 @@ We just launched a free website privacy scanner — paste your URL and in 60 sec
 
 The surprising finding from our beta: the average small business website has 17 trackers, many of which the owner doesn't know about. Under GDPR and CCPA, that's a compliance gap.
 
-Custodia (https://privacy.pagebolt.dev) is the full solution — AI-powered compliance that's actually affordable ($29/mo vs $10K+/year for enterprise tools).
+Custodia (https://app.custodia-privacy.com) is the full solution — AI-powered compliance that's actually affordable ($29/mo vs $10K+/year for enterprise tools).
 
 Would this be relevant for a feature in {newsletter_name}? Happy to share more details or a custom demo.
 
@@ -183,7 +183,7 @@ The human dashboard exists for monitoring and configuration, but the primary "us
 
 We think this is where compliance is heading — autonomous agents handling the tedious, detail-oriented work that humans aren't great at (like tracking which of your 23 third-party scripts are mentioned in your privacy policy).
 
-Free scan: https://privacy.pagebolt.dev
+Free scan: https://app.custodia-privacy.com
 
 Would this be a fit for {newsletter_name}? Happy to go deeper on the agent-first architecture or the technical approach.
 

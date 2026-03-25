@@ -1,7 +1,7 @@
 # Custodia Marketing Launch Report
 
 **Date:** March 24, 2026
-**Product URL:** https://privacy.pagebolt.dev
+**Product URL:** https://app.custodia-privacy.com
 **Team:** marketing-launch-2026-03-24
 
 ---

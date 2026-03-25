@@ -12,7 +12,7 @@ Scan your site → find every tracker → get a consent banner, privacy policy, 
 
 $29/mo. No lawyer needed.
 
-Free scan: https://privacy.pagebolt.dev
+Free scan: https://app.custodia-privacy.com
 
 ### Post 2: Problem-Agitation
 
@@ -26,7 +26,7 @@ Right side: Enterprise platforms ($5K-50K/yr)
 
 We built Custodia for everyone in between.
 
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com
 
 ### Post 3: Feature Highlight
 
@@ -52,7 +52,7 @@ We hear this a lot. Then we scan their site and find:
 • A chat widget storing conversation logs
 • A form plugin with its own tracking pixel
 
-Try a free scan. You'll probably be surprised: https://privacy.pagebolt.dev
+Try a free scan. You'll probably be surprised: https://app.custodia-privacy.com
 
 ### Post 5: CTA / Free Scan
 
@@ -60,7 +60,7 @@ I'll scan any website and tell you exactly what data it's collecting. Every cook
 
 Free. No signup. Takes 60 seconds.
 
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com
 
 What GDPR fines can cost: up to €20M.
 What a scan costs: $0.
@@ -96,7 +96,7 @@ Custodia fills this gap:
 
 Plans start at $29/month. Setup takes 15 minutes. No legal background required.
 
-Start with a free scan — no signup needed: https://privacy.pagebolt.dev
+Start with a free scan — no signup needed: https://app.custodia-privacy.com
 
 #privacy #GDPR #CCPA #compliance #startup #smallbusiness #saas
 
@@ -120,7 +120,7 @@ But the actual costs of non-compliance are more subtle and more common:
 
 The businesses that treat privacy as a feature, not a checkbox, will have an advantage.
 
-That's why we built Custodia: https://privacy.pagebolt.dev
+That's why we built Custodia: https://app.custodia-privacy.com
 
 ### Post 3: Product Demo Angle
 
@@ -138,7 +138,7 @@ They're not. And the tools available to them haven't been honest about that.
 
 Custodia's approach: start with a real scan, show them exactly what's happening on their site, and give them the tools to actually fix it. Not just a banner — the full compliance stack.
 
-Scan any site free, no signup: https://privacy.pagebolt.dev
+Scan any site free, no signup: https://app.custodia-privacy.com
 
 #privacy #GDPR #compliance #webdev #saas
 

@@ -67,7 +67,7 @@ It takes 15 minutes to set up. Plans start at $29/month. And the free scan takes
 
 We'd love for you to try scanning your own site and tell us what you think. What did we get right? What should we add next?
 
-https://privacy.pagebolt.dev
+https://app.custodia-privacy.com
 
 ---
 
