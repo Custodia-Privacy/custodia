@@ -7,6 +7,7 @@ const navLinks = [
   { label: "Features", href: "#features" },
   { label: "How It Works", href: "#how-it-works" },
   { label: "Pricing", href: "#pricing" },
+  { label: "Blog", href: "/blog" },
   { label: "FAQ", href: "#faq" },
 ];
 
@@ -39,15 +40,25 @@ export function Navbar() {
 
         {/* Desktop nav */}
         <div className="hidden items-center gap-8 md:flex">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950 dark:text-slate-400 dark:hover:text-white"
-            >
-              {link.label}
-            </a>
-          ))}
+          {navLinks.map((link) =>
+            link.href.startsWith("/") ? (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950 dark:text-slate-400 dark:hover:text-white"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950 dark:text-slate-400 dark:hover:text-white"
+              >
+                {link.label}
+              </a>
+            ),
+          )}
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
@@ -98,16 +109,27 @@ export function Navbar() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="border-t border-slate-200 bg-white px-6 py-4 md:hidden dark:border-slate-800 dark:bg-slate-950">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileOpen(false)}
-              className="block py-2 text-sm font-medium text-slate-600 dark:text-slate-400"
-            >
-              {link.label}
-            </a>
-          ))}
+          {navLinks.map((link) =>
+            link.href.startsWith("/") ? (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className="block py-2 text-sm font-medium text-slate-600 dark:text-slate-400"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className="block py-2 text-sm font-medium text-slate-600 dark:text-slate-400"
+              >
+                {link.label}
+              </a>
+            ),
+          )}
           <div className="mt-4 flex flex-col gap-2">
             <Link
               href="/login"
