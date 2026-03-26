@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, orgProcedure, publicProcedure } from "../trpc";
 import { enqueueScan } from "@/lib/queue";
 import { PLANS } from "@/lib/stripe";
+import { runQuickScan } from "@/lib/quick-scanner";
 
 export const scanRouter = createRouter({
   /** List scans for a site (paginated) */
@@ -168,12 +169,13 @@ export const scanRouter = createRouter({
         },
       });
 
-      await enqueueScan({
-        scanId: scan.id,
-        siteId: site.id,
-        domain,
-        scanType: "quick",
-        maxPages: 1,
+      // Run inline — no BullMQ/Redis dependency for quick scans
+      runQuickScan(ctx.db, scan.id, site.id, domain).catch((err) => {
+        console.error(`[quick-scan] ${scan.id} failed:`, err);
+        ctx.db.scan.update({
+          where: { id: scan.id },
+          data: { status: "failed", errorMessage: String(err) },
+        }).catch(() => {});
       });
 
       return { scanId: scan.id, status: "queued" as const };

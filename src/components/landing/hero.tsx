@@ -82,13 +82,13 @@ export function Hero() {
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight text-navy-950 sm:text-5xl lg:text-6xl dark:text-white">
-            Privacy compliance for businesses that can&apos;t afford a legal team
+            Your team of Privacy AI Agents
           </h1>
 
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
-            AI-powered. Actually affordable. Custodia scans your site, builds
-            your compliance stack, and keeps you compliant — automatically. Full
-            GDPR, CCPA, and state privacy law coverage from{" "}
+            Custodia deploys AI agents that scan your site, build your compliance
+            stack, and keep you compliant — automatically. Full GDPR, CCPA, and
+            global privacy law coverage starting at{" "}
             <span className="font-semibold text-navy-700 dark:text-navy-300">$29/mo</span>.
           </p>
 
@@ -187,7 +187,7 @@ export function Hero() {
                     <p className="mt-1 text-xs text-navy-600 dark:text-navy-400">
                       Sign up for a free account to get weekly monitoring, auto-generated policies, and a compliance dashboard.
                     </p>
-                    <a href="/register" className="mt-3 inline-block rounded-lg bg-navy-950 px-4 py-2 text-xs font-medium text-white hover:bg-navy-900 dark:bg-navy-600 dark:hover:bg-navy-500">
+                    <a href="/signup" className="mt-3 inline-block rounded-lg bg-navy-950 px-4 py-2 text-xs font-medium text-white hover:bg-navy-900 dark:bg-navy-600 dark:hover:bg-navy-500">
                       Get Started Free
                     </a>
                   </div>
