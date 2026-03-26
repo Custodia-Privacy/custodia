@@ -4,6 +4,10 @@
  * Runs as a separate process (deployed to Fly.io/Railway).
  * Connects to Redis for job queue, PostgreSQL for results.
  */
+import { config } from "dotenv";
+config({ path: ".env.local" });
+config({ path: ".env" });
+
 import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import type { ScanJobPayload } from "../../src/types";

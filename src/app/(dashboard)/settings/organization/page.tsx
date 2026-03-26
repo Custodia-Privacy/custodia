@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/trpc";
 
 export default function OrganizationSettingsPage() {
@@ -9,6 +9,11 @@ export default function OrganizationSettingsPage() {
   const [orgName, setOrgName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [banner, setBanner] = useState<string | null>(null);
+
+  const [brandName, setBrandName] = useState("");
+  const [brandLogoUrl, setBrandLogoUrl] = useState("");
+  const [brandColor, setBrandColor] = useState("#4f46e5");
+  const [brandWebsite, setBrandWebsite] = useState("");
 
   const { data: summary, isLoading } = api.org.summary.useQuery();
   const { data: me } = api.user.me.useQuery();
@@ -57,10 +62,31 @@ export default function OrganizationSettingsPage() {
     );
   }
 
+  const [brandInitialized, setBrandInitialized] = useState(false);
+  useEffect(() => {
+    if (summary && !brandInitialized) {
+      setBrandName(summary.branding?.brandName ?? "");
+      setBrandLogoUrl(summary.branding?.brandLogoUrl ?? "");
+      setBrandColor(summary.branding?.brandColor ?? "#4f46e5");
+      setBrandWebsite(summary.branding?.brandWebsite ?? "");
+      setBrandInitialized(true);
+    }
+  }, [summary, brandInitialized]);
+
+  const updateBranding = api.org.update.useMutation({
+    onSuccess: () => {
+      setBanner("Branding saved. Your public forms will reflect the changes.");
+      void utils.org.summary.invalidate();
+    },
+    onError: (e) => setBanner(e.message),
+  });
+
   const displayName = orgName || summary.name;
   const canEditOrg = summary.role === "owner" || summary.role === "admin";
   const isOwner = summary.role === "owner";
   const isAdmin = summary.role === "admin";
+
+  const firstSiteId = summary.sites?.[0]?.id;
 
   return (
     <div className="p-6 lg:p-8">
@@ -165,6 +191,99 @@ export default function OrganizationSettingsPage() {
           </form>
         </div>
       </div>
+
+      {/* Branding section */}
+      {canEditOrg && (
+        <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Public branding</h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Customize how your data request forms and public portals appear to visitors. No Custodia branding will be shown.
+          </p>
+          <form
+            className="mt-5 space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setBanner(null);
+              updateBranding.mutate({
+                brandName: brandName.trim() || null,
+                brandLogoUrl: brandLogoUrl.trim() || null,
+                brandColor: brandColor || null,
+                brandWebsite: brandWebsite.trim() || null,
+              });
+            }}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Company name</label>
+                <input
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  placeholder={summary.name}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                />
+                <p className="mt-1 text-xs text-slate-400">Displayed on your public forms</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Website URL</label>
+                <input
+                  value={brandWebsite}
+                  onChange={(e) => setBrandWebsite(e.target.value)}
+                  placeholder="https://yourcompany.com"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Logo URL</label>
+                <input
+                  value={brandLogoUrl}
+                  onChange={(e) => setBrandLogoUrl(e.target.value)}
+                  placeholder="https://yourcompany.com/logo.png"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                />
+                <p className="mt-1 text-xs text-slate-400">Direct link to your logo image</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Brand color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={brandColor}
+                    onChange={(e) => setBrandColor(e.target.value)}
+                    className="h-9 w-9 cursor-pointer rounded border border-slate-200 p-0.5 dark:border-slate-700"
+                  />
+                  <input
+                    value={brandColor}
+                    onChange={(e) => setBrandColor(e.target.value)}
+                    placeholder="#4f46e5"
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-400">Used for buttons and accents on your forms</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={updateBranding.isPending}
+                className="rounded-lg bg-navy-950 px-4 py-2 text-sm font-medium text-white hover:bg-navy-900 disabled:opacity-50 dark:bg-navy-600"
+              >
+                {updateBranding.isPending ? "Saving…" : "Save branding"}
+              </button>
+              {firstSiteId && (
+                <a
+                  href={`/request/${firstSiteId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-navy-600 hover:text-navy-700 dark:text-navy-400"
+                >
+                  Preview form →
+                </a>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="mt-8 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <div className="border-b border-slate-100 px-6 py-4 dark:border-slate-800">

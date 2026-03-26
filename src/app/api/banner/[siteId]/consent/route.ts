@@ -25,7 +25,7 @@ export async function POST(
   req: Request,
   props: { params: Promise<{ siteId: string }> },
 ) {
-  const { siteId } = await props.params;
+  const siteId = (await props.params).siteId.replace(/\.js$/, "");
 
   try {
     const body = await req.json();

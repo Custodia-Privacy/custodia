@@ -67,4 +67,21 @@ export function registerComplianceTools(server: McpServer, client: CustodiaClien
       };
     },
   );
+
+  server.tool(
+    "get_dashboard_overview",
+    `Get the overall privacy compliance dashboard overview. Returns: the aggregate risk score (0-100) across all sites, open tracker count, open DSAR count, privacy policy status, per-regulation compliance breakdown, and recent activity feed. This is the single most useful tool for understanding the current state of the organization's privacy compliance at a glance.`,
+    {},
+    async () => {
+      const result = await client.query("dashboard.overview");
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  );
 }

@@ -97,6 +97,12 @@ model Organization {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
+  // Public branding for white-labeled DSR forms and portals
+  brandName     String?  @map("brand_name") @db.VarChar(255)
+  brandLogoUrl  String?  @map("brand_logo_url") @db.VarChar(2048)
+  brandColor    String?  @map("brand_color") @db.VarChar(7) // hex e.g. #4f46e5
+  brandWebsite  String?  @map("brand_website") @db.VarChar(2048)
+
   members           OrgMember[]
   sites             Site[]
   alerts            Alert[]
@@ -191,11 +197,14 @@ model Site {
   privacyWebhookUrl    String? @map("privacy_webhook_url") @db.VarChar(2048)
   privacyWebhookSecret String? @map("privacy_webhook_secret") @db.VarChar(255)
 
+  /// JSON config for public-facing policy page styling
+  policyPageStyle      Json?   @map("policy_page_style")
+
   org              Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   scans            Scan[]
   findings         Finding[]
   banner           Banner?
-  policy           Policy?
+  policies         Policy[]
   consentLogs      ConsentLog[]
   alerts           Alert[]
   dsarRequests     DsarRequest[]
@@ -232,9 +241,10 @@ model Scan {
   errorMessage     String?    @map("error_message")
   createdAt        DateTime   @default(now()) @map("created_at")
 
-  site     Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  findings Finding[]
-  policies Policy[]
+  site           Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  findings       Finding[]
+  policies       Policy[]
+  policyVersions PolicyVersion[]
 
   @@index([siteId, createdAt(sort: Desc)])
   @@map("scans")
@@ -324,22 +334,54 @@ model ConsentLog {
 
 // ─── Privacy Policy ──────────────────────────────────────────────────────────
 
+enum PolicyType {
+  privacy_policy
+  cookie_policy
+  terms_of_service
+  acceptable_use
+  data_processing
+  custom
+}
+
 model Policy {
+  id              String     @id @default(uuid()) @db.Uuid
+  siteId          String     @map("site_id") @db.Uuid
+  type            PolicyType @default(privacy_policy)
+  title           String     @default("Privacy Policy") @db.VarChar(255)
+  contentHtml     String?    @map("content_html")
+  contentMarkdown String?    @map("content_markdown")
+  version         Int        @default(1)
+  basedOnScanId   String?    @map("based_on_scan_id") @db.Uuid
+  generatedAt     DateTime?  @map("generated_at")
+  publishedAt     DateTime?  @map("published_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  site        Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  basedOnScan Scan?           @relation(fields: [basedOnScanId], references: [id])
+  versions    PolicyVersion[]
+
+  @@unique([siteId, type])
+  @@index([siteId])
+  @@map("policies")
+}
+
+model PolicyVersion {
   id              String    @id @default(uuid()) @db.Uuid
-  siteId          String    @unique @map("site_id") @db.Uuid
+  policyId        String    @map("policy_id") @db.Uuid
+  version         Int
   contentHtml     String?   @map("content_html")
   contentMarkdown String?   @map("content_markdown")
-  version         Int       @default(1)
   basedOnScanId   String?   @map("based_on_scan_id") @db.Uuid
-  generatedAt     DateTime? @map("generated_at")
-  publishedAt     DateTime? @map("published_at")
+  changeNote      String?   @map("change_note") @db.VarChar(500)
+  createdBy       String?   @map("created_by") @db.VarChar(100)
   createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  site        Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  basedOnScan Scan? @relation(fields: [basedOnScanId], references: [id])
+  policy      Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  basedOnScan Scan?  @relation(fields: [basedOnScanId], references: [id])
 
-  @@map("policies")
+  @@index([policyId, version(sort: Desc)])
+  @@map("policy_versions")
 }
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────

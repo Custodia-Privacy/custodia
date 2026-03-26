@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Simplified shield for favicon (16px+) -->
+  <path d="M16 2L4 8v10c0 7.46 5.13 14.42 12 16.13C22.87 32.42 28 25.46 28 18V8L16 2z" fill="#4338ca"/>
+  <path d="M12 17l3 3 5-6" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

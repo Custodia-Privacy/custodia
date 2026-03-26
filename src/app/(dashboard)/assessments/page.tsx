@@ -143,9 +143,9 @@ export default function AssessmentsPage() {
     <div className="p-6 lg:p-8">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Privacy Assessments</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Compliance</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Run privacy impact assessments for new projects, vendors, and data processing changes.
+            Privacy impact assessments for new projects, vendors, and data processing changes
           </p>
         </div>
         <button

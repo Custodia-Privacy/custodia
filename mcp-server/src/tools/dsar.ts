@@ -100,4 +100,51 @@ export function registerDsarTools(server: McpServer, client: CustodiaClient) {
       };
     },
   );
+
+  server.tool(
+    "update_dsar_status",
+    `Advance a DSAR through the pipeline. Status flow: received → identity_verified → processing → data_collected → review → fulfilled/rejected. Each transition is logged in the audit trail. Use 'rejected' only for requests that fail identity verification or are clearly frivolous. Moving to 'fulfilled' generates a response package if one doesn't exist. Regulatory deadlines run regardless of status — always check the due date.`,
+    {
+      dsarId: z.string().uuid().describe("The UUID of the DSAR request"),
+      status: z
+        .enum(["received", "identity_verified", "processing", "data_collected", "review", "fulfilled", "rejected"])
+        .describe("The new status to set"),
+      notes: z.string().optional().describe("Optional notes about why this status change was made — recorded in the audit trail"),
+    },
+    async ({ dsarId, status, notes }) => {
+      const result = await client.mutate("dsar.updateStatus", { dsarId, status, notes });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "create_dsar",
+    `Create a new DSAR on behalf of a data subject. Required fields are the requester's name, email, and request type. This is used when a request comes in via email, phone, or another non-portal channel and needs to be logged in the system. The request is created in 'received' status and a legal deadline is automatically set based on the applicable regulation (GDPR: 30 days, CCPA: 45 days).`,
+    {
+      requesterName: z.string().describe("Full name of the data subject making the request"),
+      requesterEmail: z.string().email().describe("Email address of the data subject"),
+      type: z
+        .enum(["access", "deletion", "rectification", "portability", "opt_out", "restrict_processing"])
+        .describe("Type of data subject request"),
+      details: z.string().optional().describe("Additional details or context from the requester"),
+    },
+    async ({ requesterName, requesterEmail, type, details }) => {
+      const result = await client.mutate("dsar.create", { requesterName, requesterEmail, type, details });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  );
 }

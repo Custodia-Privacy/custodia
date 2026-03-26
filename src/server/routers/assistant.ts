@@ -20,10 +20,7 @@ const ASSISTANT_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: {
         domain: { type: "string", description: "Hostname only, e.g. shop.example.com" },
-        name: {
-          type: "string",
-          description: "Friendly label; defaults to domain if omitted",
-        },
+        name: { type: "string", description: "Friendly label; defaults to domain if omitted" },
       },
       required: ["domain"],
     },
@@ -41,28 +38,53 @@ const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "suggest_navigation",
-    description: "Suggest opening a Custodia app path in the dashboard (no server mutation).",
+    name: "propose_create_dsar",
+    description:
+      "Propose creating a new Data Subject Access Request (DSAR). The user must confirm before it runs.",
     input_schema: {
       type: "object",
       properties: {
-        path: {
+        requestType: {
           type: "string",
-          enum: [
-            "/dashboard",
-            "/sites",
-            "/dsars",
-            "/assessments",
-            "/data-map",
-            "/vendors",
-            "/preferences",
-            "/agents",
-            "/assistant",
-            "/settings",
-            "/settings/organization",
-          ],
-          description: "In-app route",
+          enum: ["access", "deletion", "rectification", "portability", "opt_out", "restrict_processing"],
+          description: "Type of data subject request",
         },
+        jurisdiction: {
+          type: "string",
+          description: "Regulation code, e.g. gdpr, ccpa, lgpd, auto",
+        },
+        requesterName: { type: "string", description: "Full name of the data subject" },
+        requesterEmail: { type: "string", description: "Email of the data subject" },
+        notes: { type: "string", description: "Optional notes about the request" },
+      },
+      required: ["requestType", "jurisdiction", "requesterName", "requesterEmail"],
+    },
+  },
+  {
+    name: "propose_update_dsar_status",
+    description:
+      "Propose moving a DSAR to a new pipeline status. Use DSAR ids from DSAR_CONTEXT.",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "UUID of the DSAR request" },
+        status: {
+          type: "string",
+          enum: ["received", "identity_verified", "processing", "data_collected", "review", "fulfilled", "rejected"],
+          description: "Target status",
+        },
+        notes: { type: "string", description: "Optional note for the status change" },
+      },
+      required: ["id", "status"],
+    },
+  },
+  {
+    name: "suggest_navigation",
+    description: "Suggest opening a Custodia app path in the dashboard (no server mutation). You can also use dynamic paths like /sites/{siteId}.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "In-app route, e.g. /dashboard, /sites, /dsars, /settings" },
         reason: { type: "string", description: "One short line shown on the button" },
       },
       required: ["path", "reason"],
@@ -71,24 +93,11 @@ const ASSISTANT_TOOLS: Anthropic.Tool[] = [
 ];
 
 export type AssistantProposal =
-  | {
-      id: string;
-      tool: "propose_create_site";
-      input: { domain: string; name?: string };
-      label: string;
-    }
-  | {
-      id: string;
-      tool: "propose_trigger_scan";
-      input: { siteId: string };
-      label: string;
-    }
-  | {
-      id: string;
-      tool: "suggest_navigation";
-      input: { path: string; reason: string };
-      label: string;
-    };
+  | { id: string; tool: "propose_create_site"; input: { domain: string; name?: string }; label: string }
+  | { id: string; tool: "propose_trigger_scan"; input: { siteId: string }; label: string }
+  | { id: string; tool: "propose_create_dsar"; input: { requestType: string; jurisdiction: string; requesterName: string; requesterEmail: string; notes?: string }; label: string }
+  | { id: string; tool: "propose_update_dsar_status"; input: { id: string; status: string; notes?: string }; label: string }
+  | { id: string; tool: "suggest_navigation"; input: { path: string; reason: string }; label: string };
 
 export const assistantRouter = createRouter({
   chat: orgProcedure
@@ -129,6 +138,13 @@ export const assistantRouter = createRouter({
         take: 30,
       });
 
+      const dsars = await ctx.db.dsarRequest.findMany({
+        where: { orgId: ctx.orgId, status: { notIn: ["fulfilled", "rejected"] } },
+        select: { id: true, requesterName: true, requesterEmail: true, requestType: true, status: true, dueDate: true },
+        orderBy: { dueDate: "asc" },
+        take: 20,
+      });
+
       const user = await ctx.db.user.findUniqueOrThrow({
         where: { id: ctx.userId },
         select: { email: true, name: true },
@@ -138,6 +154,11 @@ export const assistantRouter = createRouter({
         sites.length > 0
           ? sites.map((s) => `id=${s.id} domain=${s.domain} name=${s.name}`).join("\n")
           : "(none — use propose_create_site first)";
+
+      const dsarLines =
+        dsars.length > 0
+          ? dsars.map((d) => `id=${d.id} name=${d.requesterName} email=${d.requesterEmail} type=${d.requestType} status=${d.status} due=${d.dueDate.toISOString().slice(0, 10)}`).join("\n")
+          : "(no open requests)";
 
       const contextBlock = [
         "ORG_CONTEXT (read-only; do not invent data):",
@@ -149,10 +170,17 @@ export const assistantRouter = createRouter({
         "Sites (use these exact ids for propose_trigger_scan):",
         siteLines,
         "",
-        "You are Custodia Setup Assistant for SMB privacy programs.",
-        "Explain steps clearly. When the user wants you to DO something in the app, call the appropriate tool — tools only create proposals; the user must click Confirm in the UI.",
-        "Prefer at most 1–2 tool calls per turn. You may combine a short text answer with tools.",
-        "Do not claim data was changed without a tool proposal. For legal questions, defer to their counsel.",
+        "Open DSARs (use these ids for propose_update_dsar_status):",
+        dsarLines,
+        "",
+        "INSTRUCTIONS:",
+        "You are Custodia AI, an expert privacy compliance co-pilot for SMB owners.",
+        "- Be concise but thorough. Use markdown formatting (bold, lists, headings) for readability.",
+        "- When the user wants you to DO something in the app, call the appropriate tool — tools create proposals the user must click 'Run' to confirm.",
+        "- You can create data requests, trigger scans, update DSAR statuses, and navigate the user to pages.",
+        "- Prefer at most 1–2 tool calls per turn. You may combine a short text answer with tools.",
+        "- Do not claim data was changed without a tool proposal.",
+        "- For legal questions, provide general guidance but defer to their counsel for specifics.",
       ].join("\n");
 
       const client = new Anthropic();
@@ -200,6 +228,29 @@ export const assistantRouter = createRouter({
               input: { siteId },
               label: site ? `Run full scan for ${site.domain}` : `Run full scan (${siteId.slice(0, 8)}…)`,
             });
+          } else if (block.name === "propose_create_dsar") {
+            const requesterName = String(inputObj.requesterName ?? "").trim();
+            const requesterEmail = String(inputObj.requesterEmail ?? "").trim();
+            const requestType = String(inputObj.requestType ?? "access").trim();
+            const jurisdiction = String(inputObj.jurisdiction ?? "auto").trim();
+            if (!requesterName || !requesterEmail) continue;
+            proposals.push({
+              id,
+              tool: "propose_create_dsar",
+              input: { requestType, jurisdiction, requesterName, requesterEmail, notes: inputObj.notes ? String(inputObj.notes) : undefined },
+              label: `Create ${requestType} request for ${requesterName}`,
+            });
+          } else if (block.name === "propose_update_dsar_status") {
+            const dsarId = String(inputObj.id ?? "").trim();
+            const status = String(inputObj.status ?? "").trim();
+            if (!dsarId || !status) continue;
+            const dsar = dsars.find((d) => d.id === dsarId);
+            proposals.push({
+              id,
+              tool: "propose_update_dsar_status",
+              input: { id: dsarId, status, notes: inputObj.notes ? String(inputObj.notes) : undefined },
+              label: dsar ? `Move ${dsar.requesterName}'s request → ${status}` : `Update request → ${status}`,
+            });
           } else if (block.name === "suggest_navigation") {
             const path = String(inputObj.path ?? "").trim();
             const reason = String(inputObj.reason ?? "Open").trim();
@@ -231,11 +282,7 @@ export const assistantRouter = createRouter({
   recordConfirmedAction: orgProcedure
     .input(
       z.object({
-        action: z.enum([
-          "assistant_create_site",
-          "assistant_trigger_scan",
-          "assistant_navigate",
-        ]),
+        action: z.string().max(100),
         payload: z.record(z.any()).optional(),
         success: z.boolean(),
         errorMessage: z.string().max(2000).optional(),

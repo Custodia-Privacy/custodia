@@ -1,18 +1,6 @@
+import Link from "next/link";
+
 const tiers = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "one-time",
-    description: "One-time privacy scan to see where you stand.",
-    features: [
-      "Single website scan",
-      "Tracker & cookie identification",
-      "Basic compliance report",
-      "AI-generated summary",
-    ],
-    cta: "Scan Free",
-    highlighted: false,
-  },
   {
     name: "Starter",
     price: "$29",
@@ -20,46 +8,52 @@ const tiers = [
     description: "Everything a single-site business needs to stay compliant.",
     features: [
       "1 website",
-      "Consent banner",
-      "AI privacy policy generator",
-      "Basic compliance dashboard",
       "Weekly automated scans",
+      "Cookie consent banner",
+      "AI privacy policy",
+      "Compliance score & dashboard",
+      "AI co-pilot assistant",
       "Email support",
     ],
     cta: "Start Free Trial",
+    href: "/signup?plan=starter",
     highlighted: false,
   },
   {
     name: "Growth",
     price: "$79",
     period: "/mo",
-    description: "For growing businesses with multiple sites and real compliance needs.",
+    description:
+      "For growing businesses that handle customer data requests.",
     features: [
-      "Up to 3 websites",
+      "Up to 5 websites",
+      "Daily automated scans",
       "Everything in Starter",
-      "DSAR intake portal",
-      "Preference management",
-      "PIA / DPIA templates",
+      "Data request portal & tracking",
+      "Vendor risk management",
+      "Privacy impact assessments",
       "Priority support",
     ],
     cta: "Start Free Trial",
+    href: "/signup?plan=growth",
     highlighted: true,
   },
   {
     name: "Business",
     price: "$149",
     period: "/mo",
-    description: "Full compliance stack for serious businesses.",
+    description: "Full compliance stack for serious operations.",
     features: [
-      "Up to 10 websites",
+      "Up to 25 websites",
       "Everything in Growth",
-      "Data governance & inventory",
-      "Vendor registry & risk scoring",
+      "Advanced data governance",
       "Custom branding",
-      "API access",
+      "API & MCP access",
+      "Team collaboration (50 seats)",
       "Dedicated onboarding",
     ],
-    cta: "Contact Sales",
+    cta: "Start Free Trial",
+    href: "/signup?plan=business",
     highlighted: false,
   },
 ];
@@ -76,23 +70,23 @@ export function Pricing() {
             Compliance shouldn&apos;t cost a fortune
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-600 dark:text-slate-400">
-            Enterprise-grade privacy compliance at small business prices. No
-            hidden fees, no long contracts.
+            Enterprise-grade privacy compliance at small business prices. All
+            plans include a 14-day free trial — no credit card required.
           </p>
         </div>
 
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid gap-8 lg:grid-cols-3">
           {tiers.map((tier) => (
             <div
               key={tier.name}
-              className={`relative flex flex-col rounded-xl border p-6 ${
+              className={`relative flex flex-col rounded-2xl border p-8 ${
                 tier.highlighted
                   ? "border-navy-500 bg-navy-950 text-white shadow-xl shadow-navy-950/20 dark:border-navy-400 dark:bg-navy-900"
                   : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               }`}
             >
               {tier.highlighted && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-navy-500 px-3 py-1 text-xs font-medium text-white">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-navy-500 px-4 py-1 text-xs font-semibold text-white">
                   Most Popular
                 </span>
               )}
@@ -109,7 +103,7 @@ export function Pricing() {
 
               <div className="mt-4 flex items-baseline gap-1">
                 <span
-                  className={`text-4xl font-bold ${
+                  className={`text-5xl font-bold tracking-tight ${
                     tier.highlighted
                       ? "text-white"
                       : "text-navy-950 dark:text-white"
@@ -129,7 +123,7 @@ export function Pricing() {
               </div>
 
               <p
-                className={`mt-3 text-sm ${
+                className={`mt-4 text-sm leading-relaxed ${
                   tier.highlighted
                     ? "text-navy-200"
                     : "text-slate-500 dark:text-slate-400"
@@ -138,14 +132,12 @@ export function Pricing() {
                 {tier.description}
               </p>
 
-              <ul className="mt-6 flex-1 space-y-3">
+              <ul className="mt-8 flex-1 space-y-3">
                 {tier.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2">
+                  <li key={feature} className="flex items-start gap-3">
                     <svg
                       className={`mt-0.5 h-4 w-4 shrink-0 ${
-                        tier.highlighted
-                          ? "text-navy-300"
-                          : "text-compliant"
+                        tier.highlighted ? "text-navy-300" : "text-compliant"
                       }`}
                       fill="none"
                       viewBox="0 0 24 24"
@@ -171,18 +163,26 @@ export function Pricing() {
                 ))}
               </ul>
 
-              <button
-                className={`mt-8 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+              <Link
+                href={tier.href}
+                className={`mt-8 block w-full rounded-xl px-4 py-3 text-center text-sm font-semibold transition-colors ${
                   tier.highlighted
                     ? "bg-white text-navy-950 hover:bg-navy-50"
                     : "bg-navy-950 text-white hover:bg-navy-900 dark:bg-navy-600 dark:hover:bg-navy-500"
                 }`}
               >
                 {tier.cta}
-              </button>
+              </Link>
             </div>
           ))}
         </div>
+
+        <p className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
+          Need a free scan first?{" "}
+          <a href="#cta" className="font-medium text-navy-600 hover:text-navy-700 dark:text-navy-400">
+            Try it without signing up
+          </a>
+        </p>
       </div>
     </section>
   );

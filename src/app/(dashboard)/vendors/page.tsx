@@ -42,9 +42,9 @@ export default function VendorsPage() {
     <div className="p-6 lg:p-8">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Vendors</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Vendors</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Track third-party vendors, assess their privacy risk, and monitor compliance status.
+            Track third-party tools and services, assess privacy risk, and monitor compliance
           </p>
         </div>
         <button

@@ -1,8 +1,8 @@
 const features = [
   {
-    title: "AI Website Scanner",
+    title: "Website Scanner",
     description:
-      "Crawl your site to identify all cookies, trackers, pixels, and third-party scripts. AI classifies each by purpose and generates a data map.",
+      "Enter your URL and see every cookie, tracker, and third-party script on your site. You'll know exactly what's collecting your visitors' data.",
     icon: (
       <path
         strokeLinecap="round"
@@ -12,9 +12,9 @@ const features = [
     ),
   },
   {
-    title: "Smart Consent Management",
+    title: "Cookie Banner",
     description:
-      "Auto-detect visitor jurisdiction and apply correct legal framework. Consent banner generated from actual scan results, not templates.",
+      "Auto-generated from your actual scan results — not a generic template. Detects visitor location and shows the right consent options for their region.",
     icon: (
       <path
         strokeLinecap="round"
@@ -24,9 +24,9 @@ const features = [
     ),
   },
   {
-    title: "AI Policy Generator",
+    title: "Privacy Policy",
     description:
-      "Generate privacy policy, cookie policy, and terms of service based on what your scanner actually found. Auto-updates when your site changes.",
+      "AI writes your privacy policy based on what your scanner found — not guesses. Updates automatically when your site changes.",
     icon: (
       <path
         strokeLinecap="round"
@@ -36,21 +36,9 @@ const features = [
     ),
   },
   {
-    title: "Privacy Impact Assessments",
+    title: "Data Requests",
     description:
-      "AI-guided DPIA workflow. Answer plain-English questions, get formal assessment documents with GDPR Article 35 compliance.",
-    icon: (
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"
-      />
-    ),
-  },
-  {
-    title: "DSAR Management",
-    description:
-      "Branded intake portal for data subject requests. AI auto-classifies request type, tracks deadlines, and drafts response letters.",
+      "When someone asks \"delete my data,\" you need a process. Custodia gives you an intake portal, tracks deadlines, and helps you respond on time.",
     icon: (
       <path
         strokeLinecap="round"
@@ -60,21 +48,9 @@ const features = [
     ),
   },
   {
-    title: "Data Governance",
+    title: "Compliance Score",
     description:
-      "AI-powered data inventory with vendor registry, risk scoring, data flow visualization, and retention policy management.",
-    icon: (
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75"
-      />
-    ),
-  },
-  {
-    title: "Compliance Dashboard",
-    description:
-      "Single view across GDPR, CCPA, CPRA, and state laws. Red/yellow/green scoring with actionable recommendations and weekly re-scans.",
+      "One number that tells you how compliant you are. Red, yellow, or green — with a plain-English to-do list to get to 100.",
     icon: (
       <path
         strokeLinecap="round"
@@ -84,14 +60,14 @@ const features = [
     ),
   },
   {
-    title: "Preference Management",
+    title: "AI Co-Pilot",
     description:
-      "Communication preference center synced with your email platform and CRM. Unified consent record per user with real-time API.",
+      "Ask questions in plain English — \"Am I GDPR compliant?\" \"What should I fix first?\" Your AI assistant knows your site and gives specific answers.",
     icon: (
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"
+        d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
       />
     ),
   },
@@ -103,19 +79,19 @@ export function Features() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-navy-600 dark:text-navy-400">
-            Full compliance stack
+            What you get
           </p>
           <h2 className="mt-2 text-3xl font-bold text-navy-950 sm:text-4xl dark:text-white">
-            Everything you need to stay compliant
+            Everything you need — nothing you don&apos;t
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-600 dark:text-slate-400">
-            Not just a cookie banner. Custodia gives you a complete privacy
-            compliance platform — powered by AI, so you don&apos;t need a
-            privacy team.
+            Not just a cookie banner. Custodia is the complete privacy stack for
+            small businesses — scanning, consent, policies, data requests, and
+            ongoing monitoring.
           </p>
         </div>
 
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
             <div
               key={feature.title}

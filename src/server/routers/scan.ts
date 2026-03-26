@@ -259,7 +259,7 @@ export const scanRouter = createRouter({
       };
     }),
 
-  /** Latest findings for a site (dashboard site detail) */
+  /** Latest findings for a site, deduplicated by title + category */
   recentFindings: orgProcedure
     .input(
       z.object({
@@ -275,10 +275,17 @@ export const scanRouter = createRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Site not found" });
       }
 
-      return ctx.db.finding.findMany({
+      const all = await ctx.db.finding.findMany({
         where: { siteId: input.siteId },
         orderBy: [{ severity: "asc" }, { createdAt: "desc" }],
-        take: input.limit,
       });
+
+      const seen = new Map<string, typeof all[0]>();
+      for (const f of all) {
+        const key = `${f.title}::${f.category}`;
+        if (!seen.has(key)) seen.set(key, f);
+      }
+
+      return Array.from(seen.values()).slice(0, input.limit);
     }),
 });

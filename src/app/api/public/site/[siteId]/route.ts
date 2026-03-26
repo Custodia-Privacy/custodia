@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 /**
- * Minimal public metadata for DSAR form branding (no auth).
+ * Public metadata for DSAR form branding (no auth required).
+ * Returns site info + organization branding for white-labeled forms.
  */
 export async function GET(
   _req: Request,
@@ -12,7 +13,20 @@ export async function GET(
 
   const site = await db.site.findFirst({
     where: { id: siteId, deletedAt: null },
-    select: { id: true, domain: true, name: true },
+    select: {
+      id: true,
+      domain: true,
+      name: true,
+      org: {
+        select: {
+          brandName: true,
+          brandLogoUrl: true,
+          brandColor: true,
+          brandWebsite: true,
+          name: true,
+        },
+      },
+    },
   });
 
   if (!site) {
@@ -23,5 +37,11 @@ export async function GET(
     siteId: site.id,
     domain: site.domain,
     name: site.name,
+    branding: {
+      companyName: site.org.brandName || site.org.name,
+      logoUrl: site.org.brandLogoUrl || null,
+      accentColor: site.org.brandColor || null,
+      website: site.org.brandWebsite || `https://${site.domain}`,
+    },
   });
 }

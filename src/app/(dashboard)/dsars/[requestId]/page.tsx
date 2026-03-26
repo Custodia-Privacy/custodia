@@ -96,7 +96,7 @@ export default function DsarDetailPage() {
     return (
       <div className="p-6 lg:p-8">
         <Link href="/dsars" className="text-sm text-navy-600 hover:underline dark:text-navy-400">
-          ← Back to DSARs
+          Data Requests
         </Link>
         <p className="mt-4 text-sm text-red-600 dark:text-red-400">
           {error?.message ?? "DSAR request not found"}
@@ -122,8 +122,8 @@ export default function DsarDetailPage() {
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            DSAR — {dsar.requesterName}
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+            {dsar.requesterName}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {REQUEST_LABELS[dsar.requestType] ?? dsar.requestType} · {dsar.jurisdiction.toUpperCase()} ·

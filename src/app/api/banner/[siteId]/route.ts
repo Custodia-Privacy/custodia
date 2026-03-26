@@ -11,7 +11,7 @@ export async function GET(
   _req: Request,
   props: { params: Promise<{ siteId: string }> },
 ) {
-  const { siteId } = await props.params;
+  const siteId = (await props.params).siteId.replace(/\.js$/, "");
 
   // Fetch published banner config from database
   const banner = await db.banner.findUnique({

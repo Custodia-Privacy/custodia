@@ -2,10 +2,29 @@
 
 import { useState } from "react";
 import { api } from "@/lib/trpc";
+import { useElapsed, formatElapsed } from "@/hooks/use-elapsed";
 
 export function CTA() {
   const [url, setUrl] = useState("");
   const scan = api.scan.quick.useMutation();
+  const scanId = scan.data?.scanId;
+
+  const result = api.scan.quickResult.useQuery(
+    { scanId: scanId! },
+    {
+      enabled: !!scanId,
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        if (status === "completed" || status === "failed") return false;
+        return 2000;
+      },
+    },
+  );
+
+  const liveData = result.data;
+  const isScanning = !!scanId && (!liveData || liveData.status === "queued" || liveData.status === "running");
+  const isDone = liveData?.status === "completed";
+  const elapsed = useElapsed(scan.isPending || isScanning);
 
   function handleScan() {
     const raw = url.trim();
@@ -42,26 +61,42 @@ export function CTA() {
           />
           <button
             type="submit"
-            disabled={scan.isPending}
+            disabled={scan.isPending || isScanning}
             className="rounded-xl bg-white px-6 py-3 text-sm font-semibold text-navy-950 transition-colors hover:bg-navy-50 disabled:opacity-60"
           >
-            {scan.isPending ? "Scanning…" : "Scan My Site Free"}
+            {scan.isPending ? "Submitting…" : isScanning ? "Scanning…" : "Scan My Site Free"}
           </button>
         </form>
 
-        {scan.isSuccess && (
-          <p className="mt-4 text-sm text-green-400">
-            Scan queued! Your privacy report is being generated.
+        {isScanning && (
+          <p className="mt-4 inline-flex items-center gap-2 text-sm text-navy-200">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Scanning{liveData?.domain ? ` ${liveData.domain}` : ""}…
+            <span className="font-mono tabular-nums">{formatElapsed(elapsed)}</span>
+          </p>
+        )}
+
+        {isDone && liveData && (
+          <div className="mt-4 rounded-lg bg-navy-800 px-4 py-3 text-sm text-white">
+            Scan complete — found {liveData.findings.length} finding{liveData.findings.length !== 1 ? "s" : ""}.{" "}
+            <a href="/signup" className="font-semibold text-navy-200 underline hover:text-white">
+              Sign up free to see the full report
+            </a>
+          </div>
+        )}
+
+        {!scanId && !scan.error && (
+          <p className="mt-4 text-xs text-navy-400">
+            No credit card required. Results in under 60 seconds. Your data is
+            never shared.
           </p>
         )}
         {scan.error && (
           <p className="mt-4 text-sm text-red-400">{scan.error.message}</p>
         )}
-
-        <p className="mt-4 text-xs text-navy-400">
-          No credit card required. Results in under 60 seconds. Your data is
-          never shared.
-        </p>
       </div>
     </section>
   );

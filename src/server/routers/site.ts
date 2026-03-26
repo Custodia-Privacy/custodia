@@ -32,7 +32,7 @@ export const siteRouter = createRouter({
         where: { id: input.siteId, orgId: ctx.orgId, deletedAt: null },
         include: {
           banner: true,
-          policy: true,
+          policies: { select: { id: true, type: true, title: true, version: true, publishedAt: true } },
           scans: {
             orderBy: { createdAt: "desc" },
             take: 1,
