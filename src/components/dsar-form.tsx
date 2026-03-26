@@ -201,7 +201,7 @@ export function DsarForm({ siteId, compact = false }: DsarFormProps) {
                     ? "border-transparent ring-2"
                     : "border-slate-200 hover:border-slate-300 dark:border-slate-700"
                 }`}
-                style={requestType === t.value ? { borderColor: accent, ringColor: accent, boxShadow: `0 0 0 2px ${accent}` } : undefined}
+                style={requestType === t.value ? { borderColor: accent, boxShadow: `0 0 0 2px ${accent}` } : undefined}
               >
                 <input
                   type="radio"

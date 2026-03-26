@@ -97,12 +97,12 @@ export default function DashboardPage() {
     try {
       if (p.tool === "propose_create_site") {
         const result = await createSite.mutateAsync(p.input as { domain: string; name: string });
-        void recordAction.mutate({ toolName: p.tool, input: p.input, result: { siteId: result.id } });
+        void recordAction.mutate({ action: p.tool, success: true, payload: { ...p.input, siteId: result.id } });
         setChatMessages((prev) => [...prev, { role: "assistant", content: `Site **${(p.input as { domain: string }).domain}** added successfully!` }]);
         router.push(`/sites/${result.id}`);
       } else if (p.tool === "propose_trigger_scan") {
         await triggerScan.mutateAsync(p.input as { siteId: string });
-        void recordAction.mutate({ toolName: p.tool, input: p.input, result: {} });
+        void recordAction.mutate({ action: p.tool, success: true, payload: p.input });
         setChatMessages((prev) => [...prev, { role: "assistant", content: "Scan triggered! You can check progress on the site page." }]);
       } else if (p.tool === "suggest_navigation") {
         const path = (p.input as { path: string }).path;

@@ -609,7 +609,7 @@ INSTRUCTIONS:
 
       await ctx.db.site.update({
         where: { id: site.id },
-        data: { policyPageStyle: updated },
+        data: { policyPageStyle: JSON.parse(JSON.stringify(updated)) },
       });
 
       return updated;
@@ -646,7 +646,7 @@ INSTRUCTIONS:
 
       await ctx.db.site.update({
         where: { id: site.id },
-        data: { policyPageStyle: updated },
+        data: { policyPageStyle: JSON.parse(JSON.stringify(updated)) },
       });
 
       return updated;

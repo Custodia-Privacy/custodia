@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import type { PolicyType } from "@prisma/client";
 import { DEFAULT_POLICY_PAGE_STYLE, type PolicyPageStyle } from "@/lib/policy-page-defaults";
 import type { Metadata } from "next";
 import ReactMarkdown from "react-markdown";
@@ -30,7 +31,7 @@ interface TocEntry {
 async function getPageData(siteId: string, type: string) {
   const [policy, siblings, site] = await Promise.all([
     db.policy.findUnique({
-      where: { siteId_type: { siteId, type } },
+      where: { siteId_type: { siteId, type: type as PolicyType } },
       select: {
         title: true,
         type: true,
@@ -116,7 +117,7 @@ function autoLinkPoliciesInMarkdown(
 function HeadingWithId({ level, children }: { level: number; children: React.ReactNode }) {
   const text = extractTextFromChildren(children);
   const id = slugify(text);
-  const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+  const Tag = `h${level}` as keyof React.JSX.IntrinsicElements;
   return <Tag id={id}>{children}</Tag>;
 }
 

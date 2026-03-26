@@ -469,10 +469,10 @@ function ScanRow({ scan, isExpanded, onToggle }: {
               )}
 
               {/* AI Summary */}
-              {detail.aiSummary && (
+              {detail.summary && (
                 <div className="px-5 py-3 bg-navy-50/30 dark:bg-navy-950/20">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-navy-600 dark:text-navy-400 mb-1">AI Summary</p>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{detail.aiSummary}</p>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{String(detail.summary)}</p>
                 </div>
               )}
 

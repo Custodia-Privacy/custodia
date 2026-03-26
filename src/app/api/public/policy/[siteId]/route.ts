@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import type { PolicyType } from "@prisma/client";
 
 /**
  * Public policy endpoint — serves published policies for a site.
@@ -21,7 +22,7 @@ export async function GET(
   const format = req.nextUrl.searchParams.get("format");
 
   const policy = await db.policy.findUnique({
-    where: { siteId_type: { siteId, type } },
+    where: { siteId_type: { siteId, type: type as PolicyType } },
     select: {
       title: true,
       type: true,
