@@ -442,13 +442,44 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={handleGoToDashboard}
-                className="mt-10 w-full rounded-lg bg-navy-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-700"
-              >
-                Go to My Dashboard
-              </button>
+              {/* Plan upsell */}
+              <div className="mt-10 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Unlock your full compliance stack
+                </h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  The scan is just the start. Starter includes your consent banner, privacy policy, weekly monitoring, and compliance dashboard — all from $29/mo.
+                </p>
+                <ul className="mt-3 space-y-1.5">
+                  {[
+                    "Auto-generated consent banner",
+                    "AI privacy policy",
+                    "Weekly re-scans & alerts",
+                    "Compliance dashboard",
+                  ].map((feature) => (
+                    <li key={feature} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                      <span className="text-emerald-500">✓</span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href="/pricing"
+                  className="mt-4 flex w-full items-center justify-center rounded-lg bg-navy-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-700"
+                >
+                  Start Free Trial — $29/mo
+                </a>
+              </div>
+
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={handleGoToDashboard}
+                  className="text-sm text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  Continue to dashboard →
+                </button>
+              </div>
             </>
           )}
         </div>

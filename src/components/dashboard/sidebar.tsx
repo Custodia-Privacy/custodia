@@ -121,6 +121,20 @@ export function Sidebar({ userName = "User", planName = "Free", onNavigate }: Si
         </div>
       </nav>
 
+      {/* Upgrade CTA (free tier only) */}
+      {(planName === "Free" || planName === "free") && (
+        <div className="mx-3 mb-3 rounded-lg bg-navy-950 p-3 dark:bg-navy-900">
+          <p className="text-[12px] font-semibold text-white">Upgrade to Starter</p>
+          <p className="mt-0.5 text-[11px] text-navy-300">Weekly monitoring, auto policies &amp; DSAR handling</p>
+          <a
+            href="/pricing"
+            className="mt-2.5 block rounded-md bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-navy-950 hover:bg-navy-50"
+          >
+            Start Free Trial →
+          </a>
+        </div>
+      )}
+
       {/* Bottom section: Settings + User */}
       <div className="mt-auto border-t border-slate-100 dark:border-slate-800/60">
         <div className="px-3 pt-3 pb-2">

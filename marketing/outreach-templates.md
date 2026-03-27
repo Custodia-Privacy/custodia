@@ -17,7 +17,7 @@ You paste in your website URL, and it crawls your site like a real visitor — d
 - Which privacy regulations apply to you
 - Specific gaps in your compliance
 
-No signup needed, takes about 60 seconds: https://app.custodia-privacy.com
+No signup needed, takes about 60 seconds: https://app.custodia-privacy.com/scan
 
 The reason I built this: I kept meeting small business owners who'd been quoted $5K-$15K by privacy consultants just to figure out where they stood. That felt wrong. The scan should be free.
 
@@ -43,7 +43,7 @@ Our scanner crawls your website in a headless browser and detects:
 
 It then classifies each finding by purpose, maps the data flows, and shows you where you stand against GDPR requirements.
 
-The scan is free, no signup: https://app.custodia-privacy.com
+The scan is free, no signup: https://app.custodia-privacy.com/scan
 
 For the privacy professionals here: I'd love your feedback on accuracy and what we might be missing. We're continuously improving the classification engine and want to make sure it meets the standards this community expects.
 
@@ -68,7 +68,7 @@ Hey r/startups — launching Custodia today and wanted to share here because thi
 
 **Pricing:** Free scan → $29/mo Starter → $79/mo Growth → $149/mo Business
 
-Try the free scan (no signup): https://app.custodia-privacy.com
+Try the free scan (no signup): https://app.custodia-privacy.com/scan
 
 Happy to answer questions about the technical approach, pricing decisions, or how we validated the market.
 
@@ -91,7 +91,7 @@ Technical details:
 - Google Consent Mode v2 integration
 - tRPC API with MCP server for AI agent integration
 
-Free scan (no signup): https://app.custodia-privacy.com
+Free scan (no signup): https://app.custodia-privacy.com/scan
 
 Pricing: $29/mo for 1 site, $79/mo for 3, $149/mo for 10.
 
@@ -125,7 +125,7 @@ I kept running into the same problem: small businesses that needed GDPR/CCPA com
 **Current status:**
 Launched today. Product is live. Looking for early users and feedback.
 
-Try it: https://app.custodia-privacy.com
+Try it: https://app.custodia-privacy.com/scan
 
 ---
 
@@ -143,7 +143,7 @@ We just launched an AI-powered privacy compliance platform built for small busin
 
 Custodia fills the gap — AI scans your website, finds every tracker, and builds your full compliance stack (consent banner, privacy policy, dashboard, DSAR management) for $29/month.
 
-The free scan takes 60 seconds with no signup: https://app.custodia-privacy.com
+The free scan takes 60 seconds with no signup: https://app.custodia-privacy.com/scan
 
 Happy to provide a demo, share our approach, or write a guest piece on privacy compliance for your audience.
 
@@ -162,7 +162,7 @@ We just launched a free website privacy scanner — paste your URL and in 60 sec
 
 The surprising finding from our beta: the average small business website has 17 trackers, many of which the owner doesn't know about. Under GDPR and CCPA, that's a compliance gap.
 
-Custodia (https://app.custodia-privacy.com) is the full solution — AI-powered compliance that's actually affordable ($29/mo vs $10K+/year for enterprise tools).
+Custodia (https://app.custodia-privacy.com/scan) is the full solution — AI-powered compliance that's actually affordable ($29/mo vs $10K+/year for enterprise tools).
 
 Would this be relevant for a feature in {newsletter_name}? Happy to share more details or a custom demo.
 
@@ -183,7 +183,7 @@ The human dashboard exists for monitoring and configuration, but the primary "us
 
 We think this is where compliance is heading — autonomous agents handling the tedious, detail-oriented work that humans aren't great at (like tracking which of your 23 third-party scripts are mentioned in your privacy policy).
 
-Free scan: https://app.custodia-privacy.com
+Free scan: https://app.custodia-privacy.com/scan
 
 Would this be a fit for {newsletter_name}? Happy to go deeper on the agent-first architecture or the technical approach.
 
@@ -214,3 +214,69 @@ Would this be useful for your clients? Happy to do a quick demo and discuss what
 
 Best,
 {name}
+
+---
+
+### r/webdev
+
+**Title:** Built a free tool that scans any website for privacy compliance issues in 60 seconds
+
+Hey r/webdev — built something I think is useful for anyone doing client work.
+
+It's a free website privacy scanner: you paste a URL and it runs a headless browser scan to find every cookie, tracker, pixel, and third-party script on the site — then flags the GDPR/CCPA compliance issues.
+
+**Why this matters for web developers:**
+
+If you build websites for clients, you're often responsible for whatever's running on those pages. A client installs a plugin, you add an analytics snippet, someone enables a chat widget — suddenly there are 12 third-party scripts firing on every page load, and neither you nor the client know what they're doing.
+
+Under GDPR, the site owner is the data controller. But practically speaking, the developer who set it up often gets the call when something's wrong.
+
+The scanner: https://app.custodia-privacy.com/scan (no signup, ~60 seconds)
+
+It shows you exactly what's running, what data it's collecting, and what the compliance gaps are. Useful for your own projects or as a pre-launch audit for clients.
+
+The full product (consent banner, privacy policy, DSAR handling, monitoring) is paid starting at $29/mo, but the scan is completely free.
+
+---
+
+### r/digital_marketing
+
+**Title:** Google Consent Mode v2 became mandatory in March 2024 — is your setup actually compliant?
+
+Cross-posting this here because I've been surprised how many marketers think they've implemented Consent Mode v2 when they actually haven't.
+
+**Common mistakes I see:**
+
+1. **Wrong load order** — The `gtag('consent', 'default', {...})` call fires AFTER Google Analytics initializes. Looks fine in GTM, but the signals aren't actually controlling GA before it starts collecting.
+
+2. **Missing v2 parameters** — Consent Mode v1 had two parameters (`ad_storage`, `analytics_storage`). v2 added two more (`ad_user_data`, `ad_personalization`). If your consent initialization tag was set up before early 2024, it probably only passes the v1 parameters.
+
+3. **Blended signals** — If your banner lets users accept analytics but decline marketing, your Consent Mode update should reflect that split individually, not collapse everything into a single grant/deny.
+
+**Why it matters:** Without correct v2 signals, Google can't apply behavioral modeling to fill gaps from non-consenting users. In markets like Germany and France where 40-60% of users decline cookies, you're flying blind on nearly half your audience.
+
+Free tool to check what's running on your site: https://app.custodia-privacy.com/scan
+
+If you want to discuss the technical implementation or share what consent setup is working for you, happy to get into it in the comments.
+
+---
+
+### r/ecommerce
+
+**Title:** GDPR/CCPA compliance for e-commerce: what actually matters (and what's just theater)
+
+Running an e-commerce site means you're collecting more personal data than almost any other type of business — payment info, purchase history, browsing behavior, email addresses, shipping addresses. That's a lot of exposure.
+
+**What actually matters for e-commerce compliance:**
+
+**1. Know what's on your site.** Most store owners don't. Between the platform (Shopify/WooCommerce), apps/plugins, and the marketing tools they've installed, the average e-commerce site has 15-25 third-party scripts collecting data. Run a scan and find out: https://app.custodia-privacy.com/scan
+
+**2. Your consent banner needs to actually block things.** Not just display. If Meta Pixel fires before a user clicks Accept, you have a consent gap — regardless of what your banner says.
+
+**3. Your privacy policy must name your actual processors.** If you use Klaviyo for email, Stripe for payments, Hotjar for session recording, and Google Analytics for traffic — all four need to be named in your policy with their purpose and data handling. Generic templates don't do this.
+
+**4. Set up a DSAR process.** Under GDPR, any EU customer can ask for all the data you hold on them. Under CCPA, California customers have 45 days. You need an intake form and a documented process.
+
+The free scan I linked above shows you #1 immediately. The full platform handles #2-4 from $29/mo.
+
+Happy to answer questions about e-commerce compliance specifically — it's a topic with a lot of nuance around payment processors, email platforms, and third-party apps.

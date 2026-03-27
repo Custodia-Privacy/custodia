@@ -120,31 +120,57 @@ function renderBanner(){
     setConsent(c,'reject_all');
   };
   document.getElementById('custodia-customize').onclick=function(){
-    // Simple customize: show category toggles
     var modal=document.createElement('div');
     modal.id='custodia-modal';
+    var accent=CONFIG.primaryColor;
+    var state={};
+    CONFIG.categories.forEach(function(cat){state[cat.key]=!!cat.required;});
+
     var html='<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000000;display:flex;align-items:center;justify-content:center">'
       +'<div style="background:'+(dark?'#1a1a2e':'#fff')+';color:'+(dark?'#e0e0e0':'#333')+';padding:32px;border-radius:12px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto">'
-      +'<div style="font-size:18px;font-weight:600;margin-bottom:16px">Cookie Preferences</div>';
+      +'<div style="font-size:18px;font-weight:600;margin-bottom:20px">Cookie Preferences</div>';
     CONFIG.categories.forEach(function(cat){
-      html+='<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">'
-        +'<div><div style="font-weight:500">'+cat.name+'</div><div style="font-size:13px;opacity:0.7">'+cat.description+'</div></div>'
-        +'<label style="position:relative;display:inline-block;width:48px;height:26px">'
-        +'<input type="checkbox" data-cat="'+cat.key+'" '+(cat.required?'checked disabled':'')
-        +' style="opacity:0;width:0;height:0"><span style="position:absolute;top:0;left:0;right:0;bottom:0;background:'+(cat.required?'${primaryColor}':'#ccc')+';border-radius:26px;cursor:'+(cat.required?'not-allowed':'pointer')+'"></span></label>'
+      var on=!!cat.required;
+      html+='<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px">'
+        +'<div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px">'+cat.name+'</div><div style="font-size:13px;opacity:0.7;margin-top:2px">'+cat.description+'</div></div>'
+        +'<div data-toggle="'+cat.key+'" role="switch" aria-checked="'+on+'" tabindex="0" style="'
+        +'position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;'
+        +'background:'+(on?accent:'#ccc')+';border-radius:24px;'
+        +'cursor:'+(cat.required?'not-allowed':'pointer')+';transition:background 0.2s">'
+        +'<span style="position:absolute;top:2px;left:'+(on?'22px':'2px')+';width:20px;height:20px;'
+        +'background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:left 0.2s"></span>'
+        +'</div>'
         +'</div>';
     });
-    html+='<div style="display:flex;gap:8px;margin-top:20px">'
-      +'<button id="custodia-save" style="padding:10px 20px;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:500;background:${primaryColor};color:#fff">Save Preferences</button>'
+    html+='<div style="display:flex;gap:8px;margin-top:24px">'
+      +'<button id="custodia-save" style="padding:10px 24px;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:500;background:'+accent+';color:#fff">Save Preferences</button>'
+      +'<button id="custodia-accept-all-prefs" style="padding:10px 24px;border-radius:6px;font-size:14px;cursor:pointer;font-weight:500;background:transparent;color:'+(dark?'#e0e0e0':'#555')+';border:1px solid '+(dark?'#444':'#ddd')+'">Accept All</button>'
       +'</div></div></div>';
     modal.innerHTML=html;
     document.body.appendChild(modal);
 
+    var toggles=modal.querySelectorAll('[data-toggle]');
+    for(var i=0;i<toggles.length;i++){(function(tog){
+      var key=tog.getAttribute('data-toggle');
+      var cat=CONFIG.categories.find(function(c){return c.key===key;});
+      if(cat&&cat.required)return;
+      tog.onclick=function(){
+        state[key]=!state[key];
+        tog.style.background=state[key]?accent:'#ccc';
+        tog.setAttribute('aria-checked',String(state[key]));
+        tog.querySelector('span').style.left=state[key]?'22px':'2px';
+      };
+    })(toggles[i]);}
+
     document.getElementById('custodia-save').onclick=function(){
       var c={};
-      var boxes=modal.querySelectorAll('input[data-cat]');
-      for(var i=0;i<boxes.length;i++){c[boxes[i].getAttribute('data-cat')]=boxes[i].checked||boxes[i].disabled;}
+      CONFIG.categories.forEach(function(cat){c[cat.key]=cat.required?true:!!state[cat.key];});
       setConsent(c,'customize');
+      modal.remove();
+    };
+    document.getElementById('custodia-accept-all-prefs').onclick=function(){
+      var c={};CONFIG.categories.forEach(function(cat){c[cat.key]=true;});
+      setConsent(c,'accept_all');
       modal.remove();
     };
     modal.querySelector('div').onclick=function(e){if(e.target===this)modal.remove();};
