@@ -11,9 +11,21 @@ export async function GET(
   _req: Request,
   props: { params: Promise<{ siteId: string }> },
 ) {
-  const siteId = (await props.params).siteId.replace(/\.js$/, "");
+  const rawSiteId = (await props.params).siteId.replace(/\.js$/, "");
+  const siteId = rawSiteId.replace(/[^a-zA-Z0-9_-]/g, "");
 
-  // Fetch published banner config from database
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(siteId)) {
+    return new NextResponse("/* Custodia: Invalid site ID */", {
+      status: 400,
+      headers: {
+        "Content-Type": "application/javascript",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
   const banner = await db.banner.findUnique({
     where: { siteId },
     select: { enabled: true, publishedConfig: true },
@@ -43,16 +55,20 @@ export async function GET(
   });
 }
 
+const CSS_COLOR_RE = /^#[0-9a-fA-F]{3,8}$|^rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)$/;
+
 function generateBannerSDK(siteId: string, config: any, apiBase: string): string {
-  const { position, theme, primaryColor, content, categories, regulations, showLogo, logoUrl, customCss } =
+  const { position, theme, content, categories, regulations, showLogo, logoUrl, customCss } =
     config;
+  const primaryColor = CSS_COLOR_RE.test(config.primaryColor ?? "") ? config.primaryColor : "#2563eb";
+  const safeLogoUrl = (logoUrl && /^https:\/\//.test(logoUrl)) ? logoUrl : "";
   const isDark = theme === "dark";
 
   return `(function(){
 'use strict';
 var SITE_ID='${siteId}';
 var API='${apiBase}';
-var CONFIG=${JSON.stringify({ position, theme, primaryColor, content, logoUrl: showLogo !== false ? (logoUrl || "") : "", categories: categories.map((c: any) => ({ key: c.key, name: c.name, description: c.description, required: c.required })), regulations })};
+var CONFIG=${JSON.stringify({ position, theme, primaryColor, content, logoUrl: showLogo !== false ? safeLogoUrl : "", categories: categories.map((c: any) => ({ key: c.key, name: c.name, description: c.description, required: c.required })), regulations })};
 var CONSENT_COOKIE='custodia_consent';
 
 // Check existing consent

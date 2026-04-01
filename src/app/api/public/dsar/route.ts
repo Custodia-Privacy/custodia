@@ -4,9 +4,14 @@ import { db } from "@/lib/db";
 import { computeDsarDueDate } from "@/lib/dsar-deadlines";
 import { checkRateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { createLogger } from "@/lib/logger";
+import { getClientIp } from "@/lib/ip-check";
 import { Resend } from "resend";
 
 const log = createLogger("public/dsar");
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 
 const REQUEST_LABELS: Record<string, string> = {
   access: "Access",
@@ -36,11 +41,7 @@ const bodySchema = z.object({
   website: z.string().max(200).optional(),
 });
 
-function clientIp(req: Request): string {
-  const xf = req.headers.get("x-forwarded-for");
-  if (xf) return xf.split(",")[0]?.trim() || "unknown";
-  return req.headers.get("x-real-ip") || "unknown";
-}
+const clientIp = getClientIp;
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
   });
 
   if (!site) {
-    return NextResponse.json({ error: "site_not_found" }, { status: 404 });
+    return NextResponse.json({ error: "request_failed" }, { status: 400 });
   }
 
   const jurisdiction = input.jurisdiction.trim().toLowerCase();
@@ -138,7 +139,7 @@ export async function POST(req: Request) {
             <li><strong>Site:</strong> ${site.domain}</li>
             <li><strong>Jurisdiction:</strong> ${jurisdiction}</li>
             <li><strong>Due:</strong> ${dueDate.toISOString().slice(0, 10)}</li>
-            <li><strong>Requester:</strong> ${input.requesterName} &lt;${input.requesterEmail}&gt;</li>
+            <li><strong>Requester:</strong> ${escapeHtml(input.requesterName)} &lt;${escapeHtml(input.requesterEmail)}&gt;</li>
           </ul>
           <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/dsars">Open DSARs in Custodia</a></p>
         `,

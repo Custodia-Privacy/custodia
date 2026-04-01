@@ -7,13 +7,25 @@
 
 const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
 const PHONE_RE = /\b\+?[1-9]\d{1,2}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}\b/g;
-const IP_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+const IPV6_RE = /\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b/g;
+const SSN_RE = /\b\d{3}-\d{2}-\d{4}\b/g;
+const CC_RE = /\b(?:\d[ -]*?){13,19}\b/g;
+const JWT_RE = /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
+const API_KEY_RE = /\b(?:sk-ant-api|cust_|re_|pf_live_|sk-)[A-Za-z0-9_-]{8,}\b/g;
+const BEARER_RE = /Bearer\s+[A-Za-z0-9._~+/=-]{10,}/g;
 
 function redact(value: string): string {
   return value
     .replace(EMAIL_RE, "[EMAIL_REDACTED]")
+    .replace(SSN_RE, "[SSN_REDACTED]")
+    .replace(CC_RE, "[CC_REDACTED]")
+    .replace(JWT_RE, "[JWT_REDACTED]")
+    .replace(API_KEY_RE, "[APIKEY_REDACTED]")
+    .replace(BEARER_RE, "Bearer [TOKEN_REDACTED]")
     .replace(PHONE_RE, "[PHONE_REDACTED]")
-    .replace(IP_RE, "[IP_REDACTED]");
+    .replace(IPV4_RE, "[IP_REDACTED]")
+    .replace(IPV6_RE, "[IPV6_REDACTED]");
 }
 
 function formatArgs(args: unknown[]): string[] {

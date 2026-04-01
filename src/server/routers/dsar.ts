@@ -294,7 +294,10 @@ Respond in JSON format:
     .input(
       z.object({
         id: z.string().uuid(),
-        responsePackage: z.record(z.unknown()).optional(),
+        responsePackage: z.record(z.union([z.string().max(4096), z.boolean(), z.number(), z.null()])).refine(
+          (obj) => !("__proto__" in obj) && !("constructor" in obj) && Object.keys(obj).length <= 50,
+          { message: "Invalid response package" },
+        ).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

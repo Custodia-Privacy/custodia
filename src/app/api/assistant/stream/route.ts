@@ -120,9 +120,18 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "AI not configured" }, { status: 503 });
   }
 
-  const { messages } = await req.json();
+  let parsedBody: unknown;
+  try { parsedBody = await req.json(); } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const { messages } = parsedBody as { messages?: unknown };
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 24) {
     return Response.json({ error: "Invalid messages" }, { status: 400 });
+  }
+  for (const m of messages) {
+    if (!m || typeof m !== "object") return Response.json({ error: "Invalid message format" }, { status: 400 });
+    if (!["user", "assistant", "system"].includes(m.role)) return Response.json({ error: "Invalid role" }, { status: 400 });
+    if (typeof m.content !== "string" || m.content.length > 16000) return Response.json({ error: "Message too long" }, { status: 400 });
   }
 
   const userId = session.user.id;

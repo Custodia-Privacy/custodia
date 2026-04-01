@@ -4,6 +4,7 @@
  */
 import { createHmac, randomBytes } from "node:crypto";
 import { createLogger } from "./logger";
+import { isSafeUrl } from "./ip-check";
 
 const log = createLogger("privacy-webhook");
 const WEBHOOK_TIMEOUT_MS = 15_000;
@@ -16,31 +17,10 @@ export function signPrivacyWebhookPayload(secret: string, rawBody: string): stri
   return createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
 }
 
-const BLOCKED_HOSTS = new Set([
-  "localhost",
-  "127.0.0.1",
-  "0.0.0.0",
-  "[::1]",
-  "169.254.169.254",
-  "metadata.google.internal",
-]);
-
-/** Production: https only. Non-production: http allowed for local testing. Blocks SSRF targets. */
+/** Validates webhook URLs against SSRF (IPv4/IPv6, private ranges, metadata). */
 export function isAllowedPrivacyWebhookUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    if (process.env.NODE_ENV === "production") {
-      if (u.protocol !== "https:") return false;
-      if (BLOCKED_HOSTS.has(u.hostname)) return false;
-      if (u.hostname.endsWith(".internal") || u.hostname.endsWith(".local")) return false;
-      if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(u.hostname)) return false;
-    } else {
-      if (u.protocol !== "https:" && u.protocol !== "http:") return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  const isProd = process.env.NODE_ENV === "production";
+  return isSafeUrl(url, isProd);
 }
 
 export async function deliverPrivacyWebhook(params: {

@@ -1,9 +1,9 @@
 /**
- * Prisma client singleton with transparent field-level encryption.
- * Prevents multiple instances in development (hot-reload).
+ * Prisma client singleton with transparent field-level encryption
+ * and blind index support for searchable encrypted fields.
  */
 import { PrismaClient } from "@prisma/client";
-import { encryptOptional, decryptOptional } from "./encryption";
+import { encryptOptional, decryptOptional, blindIndex, validateEncryptionConfig } from "./encryption";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
@@ -31,20 +31,31 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
   DataStore: ["connectionConfig"],
   Site: ["privacyWebhookSecret"],
   PreferenceCenter: ["privacyWebhookSecret"],
+  WebhookSubscription: ["secret"],
+};
+
+/**
+ * Fields that need blind indexes for WHERE clause lookups.
+ * Maps model.field -> the blind index column name.
+ */
+const BLIND_INDEX_FIELDS: Record<string, Record<string, string>> = {
+  DsarRequest: { requesterEmail: "requesterEmailHash" },
+  UserPreference: { email: "emailHash", externalId: "externalIdHash" },
 };
 
 function encryptionEnabled(): boolean {
   return Boolean(process.env.ENCRYPTION_KEY);
 }
 
-/**
- * Encrypt PII fields in data before writing to the database.
- */
 function encryptDataFields(model: string, data: Record<string, unknown>): void {
   const fields = ENCRYPTED_FIELDS[model];
   if (!fields || !encryptionEnabled()) return;
   for (const field of fields) {
     if (field in data && typeof data[field] === "string") {
+      const blindFields = BLIND_INDEX_FIELDS[model];
+      if (blindFields?.[field]) {
+        data[blindFields[field]] = blindIndex(data[field] as string);
+      }
       data[field] = encryptOptional(data[field] as string);
     }
     if (field in data && data[field] != null && typeof data[field] === "object") {
@@ -56,9 +67,6 @@ function encryptDataFields(model: string, data: Record<string, unknown>): void {
   }
 }
 
-/**
- * Decrypt PII fields after reading from the database.
- */
 function decryptResultFields(model: string, result: unknown): void {
   if (!result || typeof result !== "object" || !encryptionEnabled()) return;
   const fields = ENCRYPTED_FIELDS[model];
@@ -80,6 +88,22 @@ function decryptResults(model: string, result: unknown): void {
   }
 }
 
+/**
+ * Transform WHERE clauses to use blind index columns
+ * when querying encrypted fields.
+ */
+function transformWhereForBlindIndex(model: string, where: Record<string, unknown>): void {
+  const blindFields = BLIND_INDEX_FIELDS[model];
+  if (!blindFields || !encryptionEnabled()) return;
+
+  for (const [field, hashCol] of Object.entries(blindFields)) {
+    if (field in where && typeof where[field] === "string") {
+      where[hashCol] = blindIndex(where[field] as string);
+      delete where[field];
+    }
+  }
+}
+
 const basePrisma =
   globalForPrisma.prisma ??
   new PrismaClient({
@@ -87,6 +111,7 @@ const basePrisma =
   });
 
 assertGeneratedClient(basePrisma);
+validateEncryptionConfig();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = basePrisma;
@@ -112,6 +137,9 @@ const extendedPrisma = basePrisma.$extends({
           }
           if (a.update && typeof a.update === "object") {
             encryptDataFields(modelName, a.update as Record<string, unknown>);
+          }
+          if (a.where && typeof a.where === "object") {
+            transformWhereForBlindIndex(modelName, a.where as Record<string, unknown>);
           }
         }
 

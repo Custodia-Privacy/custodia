@@ -4,8 +4,7 @@
 node_modules
 *.log
 .env
-.env.local
-.env*.local
+.env.*
 test-results
 e2e
 docs
@@ -14,3 +13,4 @@ outreach
 copy
 logs
 scanner/dist
+.claude

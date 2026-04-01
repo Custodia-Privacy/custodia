@@ -18,7 +18,9 @@ import {
   apiUnauthorized,
   apiForbidden,
   apiValidationError,
+  apiRateLimited,
 } from "@/lib/api-response";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { computeDsarDueDate } from "@/lib/dsar-deadlines";
 import type { Prisma } from "@prisma/client";
 
@@ -34,7 +36,10 @@ const upsertPrefsSchema = z.object({
   center_id: z.string().uuid(),
   email: z.string().email().optional(),
   external_id: z.string().max(255).optional(),
-  preferences: z.record(z.unknown()),
+  preferences: z.record(z.union([z.boolean(), z.string().max(255), z.number()])).refine(
+    (obj) => !("__proto__" in obj) && !("constructor" in obj) && Object.keys(obj).length <= 50,
+    { message: "Invalid preference keys" },
+  ),
 }).refine((d) => d.email || d.external_id, { message: "email or external_id required" });
 
 const searchContactSchema = z.object({
@@ -45,6 +50,9 @@ export async function POST(req: Request) {
   const auth = await authenticateApiKey(req);
   if (!auth) return apiUnauthorized();
   if (!hasScope(auth, "write")) return apiForbidden("Scope 'write' required");
+
+  const rl = await checkRateLimit(`zapier:${auth.apiKeyId}`, 120, 60 * 1000);
+  if (!rl.ok) return apiRateLimited(rl);
 
   const url = new URL(req.url);
   const action = url.searchParams.get("action");
@@ -144,6 +152,6 @@ export async function POST(req: Request) {
     }
 
     default:
-      return apiValidationError(`Unknown action: ${action}. Supported: create_dsar, upsert_preferences, search_contact`);
+      return apiValidationError("Unknown action. Supported: create_dsar, upsert_preferences, search_contact");
   }
 }

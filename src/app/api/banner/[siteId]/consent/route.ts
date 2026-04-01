@@ -35,7 +35,8 @@ export async function POST(
     return NextResponse.json({ error: "Invalid siteId" }, { status: 400 });
   }
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const { getClientIp } = await import("@/lib/ip-check");
+  const clientIp = getClientIp(req);
   const rl = await checkRateLimit(`consent:${clientIp}`, 60, 60 * 1000);
   if (!rl.ok) {
     return NextResponse.json(

@@ -83,7 +83,10 @@ export async function GET(
 const upsertSchema = z.object({
   email: z.string().email().optional(),
   external_id: z.string().max(255).optional(),
-  preferences: z.record(z.unknown()),
+  preferences: z.record(z.union([z.boolean(), z.string().max(255), z.number()])).refine(
+    (obj) => !("__proto__" in obj) && !("constructor" in obj) && Object.keys(obj).length <= 50,
+    { message: "Invalid preference keys" },
+  ),
   source: z.string().max(50).default("api"),
 }).refine((d) => d.email || d.external_id, {
   message: "Either email or external_id is required",

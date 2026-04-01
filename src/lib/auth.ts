@@ -9,6 +9,10 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { compare, hash } from "bcryptjs";
+import { checkRateLimit } from "./rate-limit";
+import { createLogger } from "./logger";
+
+const secLog = createLogger("auth:security");
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db) as any,
@@ -30,17 +34,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email = credentials.email as string;
+        const email = (credentials.email as string).toLowerCase().trim();
         const password = credentials.password as string;
 
+        const rl = await checkRateLimit(`login:${email}`, 5, 15 * 60 * 1000);
+        if (!rl.ok) {
+          secLog.warn("Login rate limited", { email: "[redacted]", remaining: rl.remaining });
+          return null;
+        }
+
         const user = await db.user.findUnique({ where: { email } });
-        if (!user?.passwordHash) return null;
+        if (!user?.passwordHash) {
+          secLog.warn("Login failed: user not found or no password");
+          return null;
+        }
 
         const valid = await compare(password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          secLog.warn("Login failed: invalid password");
+          return null;
+        }
 
-        if (!user.emailVerifiedAt) return null;
+        if (!user.emailVerifiedAt) {
+          secLog.warn("Login failed: email not verified");
+          return null;
+        }
 
+        secLog.info("Login successful");
         return { id: user.id, email: user.email, name: user.name, image: user.image };
       },
     }),
@@ -52,7 +72,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     authorized({ auth: session, request: { nextUrl } }) {
       const isLoggedIn = !!session?.user;
-      // Keep in sync with `src/proxy.ts` protectedPaths
       const protectedPrefixes = [
         "/dashboard",
         "/sites",
@@ -73,18 +92,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
       }
-      // On sign-in or update, load org membership
-      if (trigger === "signIn" || trigger === "update" || (token.id && !token.orgId)) {
-        const membership = await db.orgMember.findFirst({
-          where: { userId: token.id as string },
-          include: { org: true },
-          orderBy: { createdAt: "asc" },
-        });
-        if (membership) {
-          token.orgId = membership.orgId;
-          token.orgRole = membership.role;
-          token.orgSlug = membership.org.slug;
-        }
+      const membership = await db.orgMember.findFirst({
+        where: { userId: token.id as string },
+        include: { org: true },
+        orderBy: { createdAt: "asc" },
+      });
+      if (membership) {
+        token.orgId = membership.orgId;
+        token.orgRole = membership.role;
+        token.orgSlug = membership.org.slug;
       }
       return token;
     },
@@ -98,7 +114,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: 8 * 60 * 60,
+    updateAge: 60 * 60,
+  },
   secret: process.env.NEXTAUTH_SECRET,
 });
 

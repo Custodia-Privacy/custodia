@@ -7,6 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { db } from "./db";
+import { logSecurityEvent } from "./security-events";
 
 export interface ApiAuthContext {
   orgId: string;
@@ -37,9 +38,10 @@ export async function authenticateApiKey(
     },
   });
 
-  if (!key) return null;
-  if (key.revokedAt) return null;
-  if (key.expiresAt && key.expiresAt < new Date()) return null;
+  if (!key || key.revokedAt || (key.expiresAt && key.expiresAt < new Date())) {
+    logSecurityEvent("api_key.auth_failed", { reason: !key ? "not_found" : key.revokedAt ? "revoked" : "expired" });
+    return null;
+  }
 
   void db.apiKey.update({
     where: { id: key.id },

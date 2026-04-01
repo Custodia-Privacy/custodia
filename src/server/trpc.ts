@@ -19,12 +19,20 @@ interface SessionWithOrg {
 /**
  * Context creation — runs for every tRPC request.
  * Provides the authenticated user session and database client.
+ * Validates Origin header for CSRF defense-in-depth.
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = (await auth()) as SessionWithOrg | null;
+
+  const origin = opts.headers.get("origin");
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const allowedOrigin = new URL(appUrl).origin;
+  const csrfOk = !origin || origin === allowedOrigin;
+
   return {
     db,
     session,
+    csrfOk,
     ...opts,
   };
 };
@@ -52,10 +60,13 @@ export const createCallerFactory = t.createCallerFactory;
 /** Public procedure — no auth required */
 export const publicProcedure = t.procedure;
 
-/** Protected procedure — requires authenticated session */
+/** Protected procedure — requires authenticated session + CSRF check */
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   if (!ctx.session?.user?.id) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "You must be logged in" });
+  }
+  if (!ctx.csrfOk) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Invalid request origin" });
   }
   return next({
     ctx: {

@@ -3,19 +3,28 @@
  * After signup, the user must verify their email before signing in.
  */
 import { NextResponse } from "next/server";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { slugify } from "@/lib/utils";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createLogger } from "@/lib/logger";
+import { getClientIp } from "@/lib/ip-check";
 
 const log = createLogger("signup");
 
+const COMMON_PASSWORDS = new Set([
+  "password1234", "123456789012", "qwertyuiop12", "letmein12345",
+  "admin1234567", "welcome12345", "password1!", "changeme1234",
+]);
+
 const signupSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8).max(128),
+  password: z.string().min(12).max(128).refine(
+    (pw) => !COMMON_PASSWORDS.has(pw.toLowerCase()),
+    { message: "This password is too common. Please choose a stronger password." },
+  ),
   name: z.string().min(1).max(255),
   orgName: z.string().min(1).max(255).optional(),
 });
@@ -46,7 +55,7 @@ async function sendVerificationEmail(email: string, token: string): Promise<void
 
 export async function POST(req: Request) {
   try {
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const clientIp = getClientIp(req);
     const rl = await checkRateLimit(`signup:${clientIp}`, 5, 60 * 60 * 1000);
     if (!rl.ok) {
       return NextResponse.json({ error: "Too many signup attempts. Try again later." }, { status: 429 });
@@ -58,13 +67,14 @@ export async function POST(req: Request) {
     const existing = await db.user.findUnique({ where: { email: input.email } });
     if (existing?.passwordHash) {
       return NextResponse.json(
-        { error: "An account with this email already exists" },
-        { status: 409 },
+        { success: true, needsVerification: true },
+        { status: 201 },
       );
     }
 
     const passwordHash = await hashPassword(input.password);
-    const verificationToken = randomBytes(32).toString("hex");
+    const rawToken = randomBytes(32).toString("hex");
+    const verificationToken = createHash("sha256").update(rawToken).digest("hex");
     const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     if (existing) {
@@ -75,7 +85,7 @@ export async function POST(req: Request) {
       await db.verificationToken.create({
         data: { identifier: input.email, token: verificationToken, expires: tokenExpiry },
       });
-      await sendVerificationEmail(input.email, verificationToken);
+      await sendVerificationEmail(input.email, rawToken);
       return NextResponse.json({ success: true, userId: existing.id, needsVerification: true });
     }
 
@@ -91,7 +101,7 @@ export async function POST(req: Request) {
       data: { identifier: input.email, token: verificationToken, expires: tokenExpiry },
     });
 
-    const orgName = input.orgName ?? `${input.name}'s Organization`;
+    const orgName = input.orgName || `${input.name}'s Organization`;
     const baseSlug = slugify(orgName);
     const slugExists = await db.organization.findUnique({ where: { slug: baseSlug } });
     const slug = slugExists ? `${baseSlug}-${Date.now().toString(36)}` : baseSlug;
@@ -106,7 +116,7 @@ export async function POST(req: Request) {
       },
     });
 
-    await sendVerificationEmail(input.email, verificationToken);
+    await sendVerificationEmail(input.email, rawToken);
 
     return NextResponse.json(
       { success: true, userId: user.id, needsVerification: true },

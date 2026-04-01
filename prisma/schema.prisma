@@ -447,10 +447,11 @@ model DsarRequest {
   status          DsarStatus @default(received)
   jurisdiction    String     @db.VarChar(20)
 
-  // Requester info
-  requesterName   String     @map("requester_name") @db.VarChar(255)
-  requesterEmail  String     @map("requester_email") @db.VarChar(255)
-  requesterPhone  String?    @map("requester_phone") @db.VarChar(50)
+  // Requester info (encrypted at rest; hash columns for lookups)
+  requesterName      String     @map("requester_name") @db.VarChar(512)
+  requesterEmail     String     @map("requester_email") @db.VarChar(512)
+  requesterEmailHash String?    @map("requester_email_hash") @db.VarChar(64)
+  requesterPhone     String?    @map("requester_phone") @db.VarChar(255)
   verificationId  String?    @map("verification_id")
 
   // Deadlines
@@ -698,19 +699,21 @@ model PreferenceCenter {
 }
 
 model UserPreference {
-  id          String   @id @default(uuid()) @db.Uuid
-  centerId    String   @map("center_id") @db.Uuid
-  externalId  String?  @map("external_id") @db.VarChar(255)
-  email       String?  @db.VarChar(255)
-  preferences Json
-  source      String   @default("manual") @db.VarChar(50)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid()) @db.Uuid
+  centerId       String   @map("center_id") @db.Uuid
+  externalId     String?  @map("external_id") @db.VarChar(512)
+  externalIdHash String?  @map("external_id_hash") @db.VarChar(64)
+  email          String?  @db.VarChar(512)
+  emailHash      String?  @map("email_hash") @db.VarChar(64)
+  preferences    Json
+  source         String   @default("manual") @db.VarChar(50)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   center PreferenceCenter @relation(fields: [centerId], references: [id], onDelete: Cascade)
 
-  @@index([centerId, email])
-  @@index([centerId, externalId])
+  @@index([centerId, emailHash])
+  @@index([centerId, externalIdHash])
   @@map("user_preferences")
 }
 

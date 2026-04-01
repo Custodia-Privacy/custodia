@@ -42,7 +42,10 @@ export const integrationsRouter = createRouter({
     .input(
       z.object({
         provider: providerEnum,
-        config: z.record(z.unknown()).optional(),
+        config: z.record(z.union([z.string().max(1024), z.boolean(), z.number()])).refine(
+          (obj) => !("__proto__" in obj) && !("constructor" in obj) && Object.keys(obj).length <= 20,
+          { message: "Invalid config" },
+        ).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -69,8 +72,10 @@ export const integrationsRouter = createRouter({
         },
       });
 
+      const { signCallbackState } = await import("@/app/api/integrations/callback/route");
+      const state = signCallbackState(ctx.orgId, input.provider);
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-      const callbackUrl = `${appUrl}/api/integrations/callback?provider=${input.provider}&orgId=${ctx.orgId}`;
+      const callbackUrl = `${appUrl}/api/integrations/callback?state=${encodeURIComponent(state)}`;
 
       return {
         connectUrl: `${process.env.NANGO_HOST ?? "http://localhost:3003"}/oauth/connect/${integrationId}?connection_id=${encodeURIComponent(connId)}&callback_url=${encodeURIComponent(callbackUrl)}`,

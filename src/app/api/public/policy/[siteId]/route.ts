@@ -88,6 +88,21 @@ export async function GET(
   );
 }
 
+const ALLOWED_TAGS = new Set(["h1","h2","h3","h4","h5","h6","p","br","strong","b","em","i","u","a","ul","ol","li","table","thead","tbody","tr","th","td","div","span","blockquote","hr","pre","code","img","section","article","header","footer","main","nav","dl","dt","dd","sup","sub"]);
+const TAG_RE = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
+const EVENT_RE = /\s+on\w+\s*=\s*["'][^"']*["']/gi;
+const SCRIPT_RE = /<script\b[^>]*>[\s\S]*?<\/script>/gi;
+const STYLE_TAG_RE = /<style\b[^>]*>[\s\S]*?<\/style>/gi;
+
+function sanitizeHtml(html: string): string {
+  let clean = html.replace(SCRIPT_RE, "").replace(STYLE_TAG_RE, "");
+  clean = clean.replace(EVENT_RE, "");
+  clean = clean.replace(TAG_RE, (match, tag) => {
+    return ALLOWED_TAGS.has(tag.toLowerCase()) ? match.replace(EVENT_RE, "") : "";
+  });
+  return clean;
+}
+
 function renderStandalonePage(title: string, body: string): string {
   const isMarkdown = !body.includes("<h1") && !body.includes("<h2");
   const renderedBody = isMarkdown
@@ -99,7 +114,7 @@ function renderStandalonePage(title: string, body: string): string {
         .replace(/\*(.+?)\*/g, "<em>$1</em>")
         .replace(/^- (.+)$/gm, "<li>$1</li>")
         .replace(/\n\n/g, "<br><br>")
-    : body;
+    : sanitizeHtml(body);
 
   return `<!DOCTYPE html>
 <html lang="en">
