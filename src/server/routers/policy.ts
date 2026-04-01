@@ -4,7 +4,7 @@ import { createRouter, orgProcedure } from "../trpc";
 import { PLANS } from "@/lib/stripe";
 import { DEFAULT_POLICY_PAGE_STYLE, type PolicyPageStyle } from "@/lib/policy-page-defaults";
 import { extractSiteBranding } from "@/lib/color-utils";
-import Anthropic from "@anthropic-ai/sdk";
+import { getAI, getAIModel } from "@/lib/ai";
 
 const policyTypeEnum = z.enum([
   "privacy_policy",
@@ -185,11 +185,12 @@ export const policyRouter = createRouter({
 
       const typeLabel = POLICY_TYPE_LABELS[input.type] ?? "Privacy Policy";
 
-      const client = new Anthropic();
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const client = getAI();
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 6000,
         messages: [
+          { role: "system", content: "You are a privacy policy expert. Output Markdown only — no code fences." },
           {
             role: "user",
             content: `Generate a comprehensive, clear ${typeLabel} for the website ${site.domain} (${org.name}).
@@ -213,7 +214,7 @@ Output in Markdown format only.`,
         ],
       });
 
-      const markdown = message.content[0].type === "text" ? message.content[0].text : "";
+      const markdown = completion.choices[0]?.message?.content ?? "";
       const html = markdownToHtml(markdown);
       const title = POLICY_TYPE_LABELS[input.type] ?? "Policy";
 
@@ -339,18 +340,20 @@ If the user says "done", "finish", "that's all", or similar — stop asking ques
 If the user provides corrections or requests changes, update the draft accordingly.
 Always include the ---POLICY_DRAFT--- section in every response.`;
 
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const client = getAI();
+      const response = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 8000,
-        system: systemPrompt,
-        messages: input.messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...input.messages.map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
+        ],
       });
 
-      const fullText = response.content[0].type === "text" ? response.content[0].text : "";
+      const fullText = response.choices[0]?.message?.content ?? "";
       const draftMatch = fullText.match(/---POLICY_DRAFT---\s*([\s\S]*?)\s*---END_DRAFT---/);
       const policyDraft = draftMatch?.[1]?.trim() ?? input.currentDraft;
       const chatReply = fullText.replace(/---POLICY_DRAFT---[\s\S]*?---END_DRAFT---/, "").trim();
@@ -395,14 +398,15 @@ Always include the ---POLICY_DRAFT--- section in every response.`;
       const trackers = latestScan?.findings.filter((f) => f.category === "tracker").map((f) => `${f.title}: ${f.description}`) ?? [];
       const dataCollection = latestScan?.findings.filter((f) => f.category === "data_collection").map((f) => f.title) ?? [];
 
-      const client = new Anthropic();
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const client = getAI();
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 6000,
         messages: [
+          { role: "system", content: "You are a privacy policy expert. Output the complete updated policy in Markdown only — no code fences." },
           {
             role: "user",
-            content: `You are a privacy policy expert. Update the user's EXISTING policy for ${site.domain} (${org.name}).
+            content: `Update the user's EXISTING policy for ${site.domain} (${org.name}).
 
 EXISTING POLICY:
 ---
@@ -425,7 +429,7 @@ INSTRUCTIONS:
         ],
       });
 
-      const markdown = message.content[0].type === "text" ? message.content[0].text : "";
+      const markdown = completion.choices[0]?.message?.content ?? "";
       const html = markdownToHtml(markdown);
       const title = POLICY_TYPE_LABELS[input.type] ?? "Policy";
 
@@ -466,6 +470,160 @@ INSTRUCTIONS:
           changeNote: "AI-updated from existing policy",
           createdBy: "ai",
         },
+      });
+
+      return policy;
+    }),
+
+  /** Auto-fix privacy policy gaps found during a scan */
+  fixGaps: orgProcedure
+    .input(
+      z.object({
+        siteId: z.string().uuid(),
+        gaps: z.array(z.object({
+          topic: z.string(),
+          description: z.string(),
+          recommendation: z.string(),
+        })).min(1).max(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const org = await ctx.db.organization.findUniqueOrThrow({ where: { id: ctx.orgId } });
+      const planLimits = PLANS[org.plan as keyof typeof PLANS];
+      if (!planLimits.policy) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Policy generation requires a paid plan." });
+      }
+
+      const site = await ctx.db.site.findFirst({
+        where: { id: input.siteId, orgId: ctx.orgId, deletedAt: null },
+        include: {
+          scans: {
+            where: { status: "completed" },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            include: { findings: true },
+          },
+        },
+      });
+      if (!site) throw new TRPCError({ code: "NOT_FOUND", message: "Site not found" });
+
+      const existingPolicy = await ctx.db.policy.findUnique({
+        where: { siteId_type: { siteId: input.siteId, type: "privacy_policy" } },
+      });
+
+      const latestScan = site.scans[0];
+      const cookies = latestScan?.findings.filter((f) => f.category === "cookie").map((f) => f.title) ?? [];
+      const trackers = latestScan?.findings.filter((f) => f.category === "tracker").map((f) => `${f.title}: ${f.description}`) ?? [];
+      const dataCollection = latestScan?.findings.filter((f) => f.category === "data_collection").map((f) => f.title) ?? [];
+
+      const gapList = input.gaps
+        .map((g, i) => `${i + 1}. **${g.topic}**: ${g.description}\n   Fix: ${g.recommendation}`)
+        .join("\n");
+
+      const client = getAI();
+
+      const prompt = existingPolicy?.contentMarkdown
+        ? `Update the EXISTING privacy policy for ${site.domain} (${org.name}) to fix the identified gaps.
+
+EXISTING POLICY:
+---
+${existingPolicy.contentMarkdown.slice(0, 15_000)}
+---
+
+GAPS TO FIX:
+${gapList}
+
+SCAN CONTEXT:
+- Cookies: ${cookies.join(", ") || "None"}
+- Trackers: ${trackers.join(", ") || "None"}
+- Data collection: ${dataCollection.join(", ") || "None"}
+
+INSTRUCTIONS:
+1. PRESERVE the existing structure, tone, and all existing content
+2. ADD or UPDATE only the sections needed to address each gap
+3. Do NOT remove any existing content
+4. Use clear, readable English — not legalese
+5. Output the COMPLETE updated policy in Markdown — no code fences`
+        : `Generate a comprehensive Privacy Policy for ${site.domain} (${org.name}) that specifically addresses these compliance gaps:
+
+GAPS TO ADDRESS:
+${gapList}
+
+SCAN FINDINGS:
+- Cookies: ${cookies.join(", ") || "None detected"}
+- Trackers: ${trackers.join(", ") || "None detected"}
+- Data collection: ${dataCollection.join(", ") || "None detected"}
+
+REQUIREMENTS:
+1. Write in clear, readable English — not legalese
+2. Include GDPR-required sections (data controller, legal basis, data subject rights, data retention)
+3. Include CCPA-required sections (categories of PI, right to know/delete/opt-out)
+4. Address EVERY gap listed above with specific, detailed sections
+5. Use [COMPANY NAME], [COMPANY ADDRESS], and [CONTACT EMAIL] as placeholders
+6. Include the current date as effective date
+7. Output in Markdown only — no code fences`;
+
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
+        max_tokens: 8000,
+        messages: [
+          { role: "system", content: "You are a privacy policy expert. Output Markdown only — no code fences." },
+          { role: "user", content: prompt },
+        ],
+      });
+
+      const markdown = completion.choices[0]?.message?.content ?? "";
+      if (!markdown.trim()) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return policy content." });
+      }
+
+      const html = markdownToHtml(markdown);
+      const newVersion = existingPolicy ? existingPolicy.version + 1 : 1;
+      const gapTopics = input.gaps.map((g) => g.topic).join(", ");
+
+      const policy = await ctx.db.policy.upsert({
+        where: { siteId_type: { siteId: input.siteId, type: "privacy_policy" } },
+        create: {
+          siteId: input.siteId,
+          type: "privacy_policy",
+          title: "Privacy Policy",
+          contentMarkdown: markdown,
+          contentHtml: html,
+          basedOnScanId: latestScan?.id ?? null,
+          generatedAt: new Date(),
+          version: 1,
+        },
+        update: {
+          contentMarkdown: markdown,
+          contentHtml: html,
+          basedOnScanId: latestScan?.id ?? null,
+          generatedAt: new Date(),
+          version: newVersion,
+        },
+      });
+
+      await ctx.db.policyVersion.create({
+        data: {
+          policyId: policy.id,
+          version: newVersion,
+          contentMarkdown: markdown,
+          contentHtml: html,
+          basedOnScanId: latestScan?.id ?? null,
+          changeNote: `AI auto-fix: addressed gaps in ${gapTopics}`,
+          createdBy: "ai",
+        },
+      });
+
+      // Auto-resolve the policy gap findings that were fixed
+      const gapFindingTitles = input.gaps.map((g) => `Privacy policy gap: ${g.topic}`);
+      await ctx.db.finding.updateMany({
+        where: {
+          siteId: input.siteId,
+          category: "policy",
+          title: { in: gapFindingTitles },
+          resolvedAt: null,
+        },
+        data: { resolvedAt: new Date() },
       });
 
       return policy;
@@ -603,6 +761,15 @@ INSTRUCTIONS:
         select: { id: true, policyPageStyle: true },
       });
       if (!site) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const org = await ctx.db.organization.findUniqueOrThrow({ where: { id: ctx.orgId } });
+      const planLimits = PLANS[org.plan as keyof typeof PLANS] ?? PLANS.free;
+      if (input.style.showPoweredBy === false && !planLimits.customBranding) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: 'Hiding "Powered by Custodia" requires a Growth or Business plan.',
+        });
+      }
 
       const current = mergePageStyle(site.policyPageStyle);
       const updated = { ...current, ...input.style };

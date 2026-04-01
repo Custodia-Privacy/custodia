@@ -2,7 +2,7 @@
  * AI Scan Summarizer — uses Claude to generate plain-English summaries
  * of scan results for the compliance dashboard.
  */
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 interface ScanSummaryInput {
   domain: string;
@@ -20,19 +20,23 @@ export interface ScanSummary {
   recommendations: string[];
 }
 
-const client = new Anthropic();
+const client = new OpenAI({
+  apiKey: process.env.ZHIPUAI_API_KEY,
+  baseURL: "https://open.bigmodel.cn/api/paas/v4",
+});
 
 export async function summarizeScan(input: ScanSummaryInput): Promise<ScanSummary> {
   const thirdPartyScripts = input.scripts.filter((s) => s.isThirdParty);
   const piiCollectingForms = input.forms.filter((f) => f.collectsPersonalData);
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
+  const completion = await client.chat.completions.create({
+    model: "glm-4.5-flash",
     max_tokens: 1500,
     messages: [
+      { role: "system", content: "You are a privacy compliance analyst. Respond ONLY with valid JSON — no markdown fences." },
       {
         role: "user",
-        content: `Analyze this website privacy scan and provide a concise summary. Respond ONLY with valid JSON matching this exact structure:
+        content: `Analyze this website privacy scan and provide a concise summary. Respond with JSON:
 {"overview":"string","keyFindings":["string"],"complianceRisks":["string"],"recommendations":["string"]}
 
 SCAN DATA FOR ${input.domain}:
@@ -49,7 +53,7 @@ Keep findings specific and actionable. Use plain English, not legalese. Limit to
     ],
   });
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "{}";
+  const text = completion.choices[0]?.message?.content ?? "{}";
 
   try {
     // Extract JSON from response (handle potential markdown code blocks)

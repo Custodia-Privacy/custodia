@@ -1,9 +1,40 @@
 /**
  * Next.js 16 Proxy (replaces middleware.ts).
- * Handles auth redirects and request routing.
+ * Handles auth redirects, request routing, and security headers.
  */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "X-DNS-Prefetch-Control": "off",
+};
+
+function applySecurityHeaders(response: NextResponse, pathname: string): void {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
+
+  if (pathname.startsWith("/embed/")) {
+    response.headers.set("X-Frame-Options", "ALLOWALL");
+    response.headers.set("Content-Security-Policy", "frame-ancestors *");
+  } else if (pathname.startsWith("/api/v1/docs")) {
+    response.headers.set("X-Frame-Options", "DENY");
+    response.headers.set(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' data: https://cdn.jsdelivr.net; connect-src 'self' https:; frame-ancestors 'none';",
+    );
+  } else {
+    response.headers.set("X-Frame-Options", "DENY");
+    response.headers.set(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';",
+    );
+  }
+}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -18,6 +49,8 @@ export function proxy(request: NextRequest) {
     "/api/auth",
     "/api/trpc",
     "/api/public",
+    "/api/v1",
+    "/api/integrations",
   ];
   const isPublic =
     publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
@@ -25,7 +58,9 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/preference-center/");
 
   if (isPublic) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    applySecurityHeaders(response, pathname);
+    return response;
   }
 
   const protectedPaths = [
@@ -56,7 +91,9 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  applySecurityHeaders(response, pathname);
+  return response;
 }
 
 export const config = {

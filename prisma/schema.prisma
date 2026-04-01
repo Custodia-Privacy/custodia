@@ -2,6 +2,7 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Production: ensure DATABASE_URL includes ?sslmode=require (or verify-full)
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -112,9 +113,11 @@ model Organization {
   dataFlows         DataFlow[]
   vendors           Vendor[]
   preferenceCenters PreferenceCenter[]
-  agentRuns         AgentRun[]
-  apiKeys           ApiKey[]
-  auditLogs         AuditLog[]
+  agentRuns              AgentRun[]
+  apiKeys                ApiKey[]
+  auditLogs              AuditLog[]
+  webhookSubscriptions   WebhookSubscription[]
+  integrations           Integration[]
 
   @@map("organizations")
 }
@@ -753,4 +756,79 @@ model AgentRun {
   @@index([orgId, agentType])
   @@index([orgId, createdAt(sort: Desc)])
   @@map("agent_runs")
+}
+
+// ─── Webhook Subscriptions (API v1) ──────────────────────────────────────────
+
+model WebhookSubscription {
+  id        String    @id @default(uuid()) @db.Uuid
+  orgId     String    @map("org_id") @db.Uuid
+  url       String    @db.VarChar(2048)
+  secret    String    @db.VarChar(255)
+  events    String[]
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("webhook_subscriptions")
+}
+
+// ─── Integrations (Phase B — Nango connectors) ──────────────────────────────
+
+enum IntegrationProvider {
+  salesforce
+  hubspot
+  shopify
+}
+
+enum IntegrationStatus {
+  connected
+  disconnected
+  error
+  syncing
+}
+
+model Integration {
+  id              String             @id @default(uuid()) @db.Uuid
+  orgId           String             @map("org_id") @db.Uuid
+  provider        IntegrationProvider
+  status          IntegrationStatus  @default(disconnected)
+
+  /// Nango connection ID — used to fetch tokens
+  nangoConnectionId String?          @map("nango_connection_id") @db.VarChar(255)
+
+  /// Provider-specific config (e.g. Salesforce instance URL, Shopify store domain)
+  config          Json?
+
+  lastSyncAt      DateTime?          @map("last_sync_at")
+  lastSyncError   String?            @map("last_sync_error") @db.Text
+  syncedRecords   Int                @default(0) @map("synced_records")
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  syncLogs SyncLog[]
+
+  @@unique([orgId, provider])
+  @@map("integrations")
+}
+
+model SyncLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  integrationId String   @map("integration_id") @db.Uuid
+  action        String   @db.VarChar(100)
+  recordsCount  Int      @default(0) @map("records_count")
+  durationMs    Int?     @map("duration_ms")
+  error         String?  @db.Text
+  details       Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, createdAt(sort: Desc)])
+  @@map("sync_logs")
 }

@@ -84,3 +84,25 @@ export const orgProcedure = protectedProcedure.use(async ({ ctx, next }) => {
     },
   });
 });
+
+/** Admin procedure — requires org admin or owner role */
+export const adminProcedure = orgProcedure.use(({ ctx, next }) => {
+  if (ctx.orgRole !== "admin" && ctx.orgRole !== "owner") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This action requires admin privileges",
+    });
+  }
+  return next({ ctx });
+});
+
+/** Owner procedure — requires org owner role */
+export const ownerProcedure = orgProcedure.use(({ ctx, next }) => {
+  if (ctx.orgRole !== "owner") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This action requires owner privileges",
+    });
+  }
+  return next({ ctx });
+});

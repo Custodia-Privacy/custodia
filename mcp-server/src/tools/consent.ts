@@ -103,7 +103,7 @@ export function registerConsentTools(server: McpServer, client: CustodiaClient) 
       siteId: z.string().uuid().describe("The UUID of the site"),
     },
     async ({ siteId }) => {
-      const result = await client.query("banner.preview", { siteId });
+      const result = await client.query("dashboard.overview");
       return {
         content: [
           {

@@ -76,12 +76,10 @@ async function sendWelcomeEmail(email: string, apiKey: string): Promise<void> {
     });
     if (!res.ok) {
       const body = await res.text();
-      console.error("[blog-subscribe] welcome email error", res.status, body);
-    } else {
-      console.log("[blog-subscribe] welcome email sent to", email);
+      console.error("[blog-subscribe] welcome email error", res.status);
     }
   } catch (err) {
-    console.error("[blog-subscribe] welcome email fetch error", err);
+    console.error("[blog-subscribe] welcome email delivery failed");
   }
 }
 

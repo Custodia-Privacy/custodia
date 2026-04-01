@@ -13,10 +13,14 @@ import { agentsRouter } from "./routers/agents";
 import { dashboardRouter } from "./routers/dashboard";
 import { orgRouter } from "./routers/org";
 import { assistantRouter } from "./routers/assistant";
+import { apiKeyRouter } from "./routers/apiKey";
+import { findingRouter } from "./routers/finding";
+import { integrationsRouter } from "./routers/integrations";
 
 export const appRouter = createRouter({
   site: siteRouter,
   scan: scanRouter,
+  finding: findingRouter,
   banner: bannerRouter,
   policy: policyRouter,
   billing: billingRouter,
@@ -29,6 +33,8 @@ export const appRouter = createRouter({
   dashboard: dashboardRouter,
   org: orgRouter,
   assistant: assistantRouter,
+  apiKey: apiKeyRouter,
+  integrations: integrationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

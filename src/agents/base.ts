@@ -4,8 +4,9 @@
  * Manages run lifecycle (status, logs, completion/failure),
  * provides a lazy Anthropic client, and defines the execute() contract.
  */
-import Anthropic from "@anthropic-ai/sdk";
+import type OpenAI from "openai";
 import type { PrismaClient } from "@prisma/client";
+import { getAI, getAIModel } from "@/lib/ai";
 
 export type LogLevel = "info" | "warn" | "error" | "debug";
 
@@ -19,7 +20,7 @@ export abstract class BaseAgent {
   protected orgId: string;
   protected runId: string;
   protected db: PrismaClient;
-  private _ai: Anthropic | null = null;
+  private _ai: OpenAI | null = null;
   private _logs: AgentLogEntry[] = [];
   private _tokensUsed = 0;
 
@@ -29,10 +30,9 @@ export abstract class BaseAgent {
     this.db = db;
   }
 
-  /** Lazy-initialize the Anthropic client (shares one per agent run). */
-  protected getAI(): Anthropic {
+  protected getAI(): OpenAI {
     if (!this._ai) {
-      this._ai = new Anthropic();
+      this._ai = getAI();
     }
     return this._ai;
   }
@@ -96,7 +96,7 @@ export abstract class BaseAgent {
   }
 
   /**
-   * Call Claude with usage tracking. Wraps the Anthropic SDK
+   * Call the AI model with usage tracking. Wraps the OpenAI-compatible SDK
    * and accumulates token counts for cost calculation.
    */
   protected async callClaude(params: {
@@ -105,19 +105,20 @@ export abstract class BaseAgent {
     maxTokens?: number;
   }): Promise<string> {
     const ai = this.getAI();
-    const response = await ai.messages.create({
-      model: "claude-sonnet-4-6",
+    const response = await ai.chat.completions.create({
+      model: getAIModel(),
       max_tokens: params.maxTokens ?? 4096,
-      system: params.system,
-      messages: [{ role: "user", content: params.prompt }],
+      messages: [
+        { role: "system", content: params.system },
+        { role: "user", content: params.prompt },
+      ],
     });
 
-    const inputTokens = response.usage?.input_tokens ?? 0;
-    const outputTokens = response.usage?.output_tokens ?? 0;
+    const inputTokens = response.usage?.prompt_tokens ?? 0;
+    const outputTokens = response.usage?.completion_tokens ?? 0;
     this._tokensUsed += inputTokens + outputTokens;
 
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
-    return text;
+    return response.choices[0]?.message?.content ?? "";
   }
 
   /** Extract JSON from a Claude response (handles markdown fences). */

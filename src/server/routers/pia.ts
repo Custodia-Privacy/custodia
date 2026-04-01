@@ -3,11 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import { createRouter, orgProcedure } from "../trpc";
-import Anthropic from "@anthropic-ai/sdk";
-
-function getAI() {
-  return new Anthropic();
-}
+import { getAI, getAIModel } from "@/lib/ai";
 
 async function logAssessmentActivity(
   db: PrismaClient,
@@ -203,13 +199,14 @@ export const piaRouter = createRouter({
       }
 
       const client = getAI();
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 4000,
         messages: [
+          { role: "system", content: "You are a privacy compliance AI agent. Respond ONLY with valid JSON — no markdown fences." },
           {
             role: "user",
-            content: `You are a privacy compliance AI agent generating Privacy Impact Assessment (PIA) questions.
+            content: `Generate Privacy Impact Assessment (PIA) questions.
 
 PROJECT DETAILS:
 - Title: ${assessment.title}
@@ -240,8 +237,7 @@ Respond ONLY with a JSON array of question objects:
         ],
       });
 
-      const responseText =
-        message.content[0].type === "text" ? message.content[0].text : "";
+      const responseText = completion.choices[0]?.message?.content ?? "";
 
       let questions: unknown[];
       try {
@@ -328,13 +324,17 @@ Respond ONLY with a JSON array of question objects:
       });
 
       const client = getAI();
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 6000,
         messages: [
           {
+            role: "system",
+            content: "You are a senior privacy compliance AI analyst. Respond ONLY with valid JSON — no markdown fences.",
+          },
+          {
             role: "user",
-            content: `You are a senior privacy compliance AI analyst performing a Privacy Impact Assessment (PIA) review.
+            content: `Perform a Privacy Impact Assessment (PIA) review.
 
 PROJECT:
 - Title: ${assessment.title}
@@ -382,8 +382,7 @@ Respond in JSON format:
         ],
       });
 
-      const responseText =
-        message.content[0].type === "text" ? message.content[0].text : "";
+      const responseText = completion.choices[0]?.message?.content ?? "";
 
       let parsed: {
         riskLevel?: string;

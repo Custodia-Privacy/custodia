@@ -15,7 +15,7 @@ export function registerGovernanceTools(server: McpServer, client: CustodiaClien
         .describe("Filter by data store type"),
     },
     async ({ type }) => {
-      const result = await client.query("dataStore.list", { type });
+      const result = await client.query("governance.listStores", { type });
       return {
         content: [
           {
@@ -40,7 +40,7 @@ export function registerGovernanceTools(server: McpServer, client: CustodiaClien
       description: z.string().optional().describe("Description of what this store is used for"),
     },
     async ({ name, type, provider, location, description }) => {
-      const result = await client.mutate("dataStore.create", {
+      const result = await client.mutate("governance.createStore", {
         name,
         type,
         provider,
@@ -65,7 +65,7 @@ export function registerGovernanceTools(server: McpServer, client: CustodiaClien
       storeId: z.string().uuid().describe("The UUID of the data store to classify"),
     },
     async ({ storeId }) => {
-      const result = await client.mutate("dataStore.classify", { storeId });
+      const result = await client.mutate("governance.classifyStore", { storeId });
       return {
         content: [
           {
@@ -82,7 +82,7 @@ export function registerGovernanceTools(server: McpServer, client: CustodiaClien
     `AI-discover data flows between registered data stores. Analyzes how personal data moves through the organization — from collection points (website forms, APIs) through processing systems (databases, analytics) to third parties (vendors, partners). Identifies cross-border transfers (critical for GDPR Chapter V compliance), purposes of each transfer, and legal basis. This builds the data flow map required for ROPA compliance.`,
     {},
     async () => {
-      const result = await client.mutate("dataFlow.discover");
+      const result = await client.mutate("governance.mapFlows");
       return {
         content: [
           {
@@ -103,7 +103,7 @@ export function registerGovernanceTools(server: McpServer, client: CustodiaClien
       category: z.string().optional().describe("Filter by vendor category, e.g. 'analytics', 'hosting', 'email', 'payment'"),
     },
     async ({ category }) => {
-      const result = await client.query("vendor.list", { category });
+      const result = await client.query("governance.listVendors");
       return {
         content: [
           {
@@ -129,7 +129,7 @@ export function registerGovernanceTools(server: McpServer, client: CustodiaClien
       legalBasis: z.string().max(100).optional().describe("Legal basis for sharing: consent, legitimate_interest, contract, legal_obligation"),
     },
     async ({ name, category, website, dpaUrl, privacyPolicyUrl, dataShared, purposes, legalBasis }) => {
-      const result = await client.mutate("vendor.create", {
+      const result = await client.mutate("governance.createVendor", {
         name,
         category,
         website,
@@ -157,7 +157,7 @@ export function registerGovernanceTools(server: McpServer, client: CustodiaClien
       vendorId: z.string().uuid().describe("The UUID of the vendor to review"),
     },
     async ({ vendorId }) => {
-      const result = await client.mutate("vendor.review", { vendorId });
+      const result = await client.mutate("governance.reviewVendor", { vendorId });
       return {
         content: [
           {

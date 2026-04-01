@@ -13,6 +13,8 @@ export const PLANS = {
     policy: false,
     teamMembers: 1,
     consentLogRetention: 0,
+    aiCompletionsPerMonth: 5,
+    customBranding: false,
   },
   starter: {
     name: "Starter",
@@ -26,6 +28,8 @@ export const PLANS = {
     policy: true,
     teamMembers: 3,
     consentLogRetention: 90,
+    aiCompletionsPerMonth: 50,
+    customBranding: false,
   },
   growth: {
     name: "Growth",
@@ -39,6 +43,8 @@ export const PLANS = {
     policy: true,
     teamMembers: 10,
     consentLogRetention: 365,
+    aiCompletionsPerMonth: 200,
+    customBranding: true,
   },
   business: {
     name: "Business",
@@ -52,6 +58,8 @@ export const PLANS = {
     policy: true,
     teamMembers: 50,
     consentLogRetention: 730,
+    aiCompletionsPerMonth: 1000,
+    customBranding: true,
   },
 } as const;
 

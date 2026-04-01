@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { computeDsarDueDate } from "@/lib/dsar-deadlines";
-import { checkPublicRateLimit } from "@/lib/public-rate-limit";
+import { checkRateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
 import { Resend } from "resend";
+
+const log = createLogger("public/dsar");
 
 const REQUEST_LABELS: Record<string, string> = {
   access: "Access",
@@ -45,13 +48,13 @@ function getResend() {
 
 export async function POST(req: Request) {
   const ip = clientIp(req);
-  const limited = checkPublicRateLimit(`dsar:${ip}`, 15, 60 * 60 * 1000);
+  const limited = await checkRateLimit(`dsar:${ip}`, 15, 60 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: "rate_limited", retryAfterSec: limited.retryAfterSec },
       {
         status: 429,
-        headers: { "Retry-After": String(limited.retryAfterSec) },
+        headers: rateLimitHeaders(limited),
       },
     );
   }
@@ -141,7 +144,7 @@ export async function POST(req: Request) {
         `,
       });
     } catch (e) {
-      console.error("[public/dsar] Resend failed", e);
+      log.error("Notification email delivery failed", e);
     }
   }
 

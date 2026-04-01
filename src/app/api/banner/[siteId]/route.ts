@@ -44,7 +44,7 @@ export async function GET(
 }
 
 function generateBannerSDK(siteId: string, config: any, apiBase: string): string {
-  const { position, theme, primaryColor, content, categories, regulations, showLogo, customCss } =
+  const { position, theme, primaryColor, content, categories, regulations, showLogo, logoUrl, customCss } =
     config;
   const isDark = theme === "dark";
 
@@ -52,7 +52,7 @@ function generateBannerSDK(siteId: string, config: any, apiBase: string): string
 'use strict';
 var SITE_ID='${siteId}';
 var API='${apiBase}';
-var CONFIG=${JSON.stringify({ position, theme, primaryColor, content, categories: categories.map((c: any) => ({ key: c.key, name: c.name, description: c.description, required: c.required })), regulations })};
+var CONFIG=${JSON.stringify({ position, theme, primaryColor, content, logoUrl: showLogo !== false ? (logoUrl || "") : "", categories: categories.map((c: any) => ({ key: c.key, name: c.name, description: c.description, required: c.required })), regulations })};
 var CONSENT_COOKIE='custodia_consent';
 
 // Check existing consent
@@ -71,8 +71,7 @@ function setConsent(consent,action){
   xhr.open('POST',API+'/api/banner/'+SITE_ID+'/consent');
   xhr.setRequestHeader('Content-Type','application/json');
   xhr.send(JSON.stringify({consent:consent,action:action,visitorId:getVisitorId(),userAgent:navigator.userAgent}));
-  // Fire callback
-  if(window.custodiaOnConsent)window.custodiaOnConsent(consent);
+  applyConsent(consent);
 }
 
 function getVisitorId(){
@@ -82,6 +81,41 @@ function getVisitorId(){
 }
 
 function hideBanner(){var b=document.getElementById('custodia-cb');if(b)b.style.display='none';}
+
+function enableCategory(key){
+  var scripts=document.querySelectorAll('script[type="text/plain"][data-custodia-category="'+key+'"]');
+  for(var i=0;i<scripts.length;i++){
+    var old=scripts[i];
+    var s=document.createElement('script');
+    for(var j=0;j<old.attributes.length;j++){
+      var a=old.attributes[j];
+      if(a.name==='type'||a.name==='data-custodia-category')continue;
+      s.setAttribute(a.name,a.value);
+    }
+    if(old.src){s.src=old.src;}else{s.textContent=old.textContent;}
+    old.parentNode.replaceChild(s,old);
+  }
+}
+
+function updateGoogleConsent(consent){
+  if(typeof gtag==='function'){
+    gtag('consent','update',{
+      'ad_storage':consent.marketing?'granted':'denied',
+      'analytics_storage':consent.analytics?'granted':'denied',
+      'ad_user_data':consent.marketing?'granted':'denied',
+      'ad_personalization':consent.marketing?'granted':'denied'
+    });
+  }
+}
+
+function applyConsent(consent){
+  for(var key in consent){if(consent[key])enableCategory(key);}
+  updateGoogleConsent(consent);
+  try{window.dispatchEvent(new CustomEvent('custodia:consent',{detail:consent}));}catch(e){}
+  if(window.custodiaOnConsent)window.custodiaOnConsent(consent);
+}
+
+window.Custodia={getConsent:getConsent,showBanner:function(){hideBanner();renderBanner();}};
 
 function renderBanner(){
   var existing=getConsent();
@@ -100,7 +134,7 @@ function renderBanner(){
     +'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;'
     +(pos==='bottom'?'':'border-radius:12px;')
     +'">'
-    +'<div style="font-size:16px;font-weight:600;margin-bottom:8px">${escapeJs(content.title)}</div>'
+    +(CONFIG.logoUrl?'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><img src="'+CONFIG.logoUrl+'" alt="" style="height:24px;width:auto;object-fit:contain" onerror="this.style.display=\\'none\\'"/><div style="font-size:16px;font-weight:600">${escapeJs(content.title)}</div></div>':'<div style="font-size:16px;font-weight:600;margin-bottom:8px">${escapeJs(content.title)}</div>')
     +'<div style="font-size:14px;line-height:1.5;opacity:0.85;margin-bottom:16px">${escapeJs(content.description)}</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
     +'<button id="custodia-accept" style="padding:10px 20px;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:500;background:${primaryColor};color:#fff">${escapeJs(content.acceptAllText)}</button>'
@@ -132,7 +166,7 @@ function renderBanner(){
     CONFIG.categories.forEach(function(cat){
       var on=!!cat.required;
       html+='<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px">'
-        +'<div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px">'+cat.name+'</div><div style="font-size:13px;opacity:0.7;margin-top:2px">'+cat.description+'</div></div>'
+        +'<div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px">'+escapeHtml(cat.name)+'</div><div style="font-size:13px;opacity:0.7;margin-top:2px">'+escapeHtml(cat.description)+'</div></div>'
         +'<div data-toggle="'+cat.key+'" role="switch" aria-checked="'+on+'" tabindex="0" style="'
         +'position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;'
         +'background:'+(on?accent:'#ccc')+';border-radius:24px;'
@@ -179,10 +213,20 @@ function renderBanner(){
 
 ${customCss ? `// Custom CSS\nvar style=document.createElement('style');style.textContent=${JSON.stringify(customCss)};document.head.appendChild(style);` : ''}
 
-if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',renderBanner);}else{renderBanner();}
+function init(){
+  enableCategory('necessary');
+  var ec=getConsent();
+  if(ec){applyConsent(ec);}
+  else{renderBanner();}
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
 })();`;
 }
 
 function escapeJs(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

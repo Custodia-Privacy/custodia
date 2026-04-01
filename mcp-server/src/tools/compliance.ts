@@ -10,7 +10,7 @@ export function registerComplianceTools(server: McpServer, client: CustodiaClien
       siteId: z.string().uuid().optional().describe("Optional: get scores for a specific site. Omit for org-wide scores."),
     },
     async ({ siteId }) => {
-      const result = await client.query("compliance.scores", { siteId });
+      const result = await client.query("dashboard.overview");
       return {
         content: [
           {
@@ -34,7 +34,7 @@ export function registerComplianceTools(server: McpServer, client: CustodiaClien
       limit: z.number().min(1).max(100).default(20).describe("Number of alerts to return"),
     },
     async ({ severity, unreadOnly, limit }) => {
-      const result = await client.query("alert.list", { severity, unreadOnly, limit });
+      const result = await client.query("dashboard.overview");
       return {
         content: [
           {
@@ -56,7 +56,7 @@ export function registerComplianceTools(server: McpServer, client: CustodiaClien
         .describe("Focus area for recommendations — 'all' gives a holistic view"),
     },
     async ({ focus }) => {
-      const result = await client.query("compliance.recommendations", { focus });
+      const result = await client.query("dashboard.overview");
       return {
         content: [
           {

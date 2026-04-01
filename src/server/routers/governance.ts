@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, orgProcedure } from "../trpc";
-import Anthropic from "@anthropic-ai/sdk";
-
-function getAI() {
-  return new Anthropic();
-}
+import { getAI, getAIModel } from "@/lib/ai";
 
 export const governanceRouter = createRouter({
   /** List all data stores for the organization */
@@ -141,13 +137,17 @@ export const governanceRouter = createRouter({
       }
 
       const client = getAI();
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 1500,
         messages: [
           {
+            role: "system",
+            content: "You are a data privacy classification engine. Respond ONLY with valid JSON — no markdown fences.",
+          },
+          {
             role: "user",
-            content: `You are a data privacy classification engine. Analyze this data store and classify it.
+            content: `Analyze this data store and classify it.
 
 DATA STORE:
 - Name: ${store.name}
@@ -156,7 +156,7 @@ DATA STORE:
 - Location: ${store.location ?? "Unknown"}
 - Description: ${store.description ?? "No description provided"}
 
-Respond with ONLY valid JSON (no markdown fences):
+Respond with ONLY valid JSON:
 {
   "dataTypes": ["list of data type categories stored, e.g. personal_info, financial, health, behavioral, contact, authentication"],
   "sensitivity": "one of: public, internal, confidential, restricted, pii, sensitive_pii",
@@ -166,7 +166,7 @@ Respond with ONLY valid JSON (no markdown fences):
         ],
       });
 
-      const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+      const raw = completion.choices[0]?.message?.content ?? "{}";
       let classification: { dataTypes?: string[]; sensitivity?: string; piiFields?: string[] };
       try {
         classification = JSON.parse(raw);
@@ -289,13 +289,17 @@ Respond with ONLY valid JSON (no markdown fences):
       .join("\n");
 
     const client = getAI();
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
+    const completion = await client.chat.completions.create({
+      model: getAIModel(),
       max_tokens: 3000,
       messages: [
         {
+          role: "system",
+          content: "You are a data flow mapping engine for privacy compliance. Respond ONLY with valid JSON — no markdown fences.",
+        },
+        {
           role: "user",
-          content: `You are a data flow mapping engine for privacy compliance. Analyze these data stores and suggest likely data flows between them.
+          content: `Analyze these data stores and suggest likely data flows between them.
 
 DATA STORES:
 ${storeList}
@@ -305,7 +309,7 @@ For each suggested flow, consider:
 - Data types that would flow between them
 - Whether the flow crosses borders (different locations)
 
-Respond with ONLY valid JSON (no markdown fences):
+Respond with ONLY valid JSON:
 {
   "suggestions": [
     {
@@ -325,7 +329,7 @@ Respond with ONLY valid JSON (no markdown fences):
       ],
     });
 
-    const raw = message.content[0].type === "text" ? message.content[0].text : '{"suggestions":[]}';
+    const raw = completion.choices[0]?.message?.content ?? '{"suggestions":[]}';
     let parsed: {
       suggestions: Array<{
         sourceId: string;
@@ -436,13 +440,17 @@ Respond with ONLY valid JSON (no markdown fences):
       }
 
       const client = getAI();
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 2000,
         messages: [
           {
+            role: "system",
+            content: "You are a vendor privacy risk assessor. Respond ONLY with valid JSON — no markdown fences.",
+          },
+          {
             role: "user",
-            content: `You are a vendor privacy risk assessor. Analyze this vendor and assess their privacy risk.
+            content: `Analyze this vendor and assess their privacy risk.
 
 VENDOR:
 - Name: ${vendor.name}
@@ -461,7 +469,7 @@ Assess the vendor on:
 4. Compliance status (compliant, needs_review, non_compliant, unknown)
 5. Key concerns and recommendations
 
-Respond with ONLY valid JSON (no markdown fences):
+Respond with ONLY valid JSON:
 {
   "riskLevel": "one of: low, medium, high, critical",
   "complianceStatus": "one of: compliant, needs_review, non_compliant, unknown",
@@ -475,7 +483,7 @@ Respond with ONLY valid JSON (no markdown fences):
         ],
       });
 
-      const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+      const raw = completion.choices[0]?.message?.content ?? "{}";
       let review: {
         riskLevel?: string;
         complianceStatus?: string;

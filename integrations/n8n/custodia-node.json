@@ -1,0 +1,127 @@
+{
+  "name": "Custodia",
+  "displayName": "Custodia Privacy",
+  "description": "Interact with Custodia privacy compliance platform",
+  "icon": "file:custodia.svg",
+  "version": 1,
+  "defaults": {
+    "name": "Custodia"
+  },
+  "credentials": [
+    {
+      "name": "custodiaApi",
+      "displayName": "Custodia API",
+      "required": true,
+      "properties": [
+        {
+          "displayName": "API Key",
+          "name": "apiKey",
+          "type": "string",
+          "typeOptions": { "password": true },
+          "default": "",
+          "placeholder": "cust_...",
+          "description": "Your Custodia API key from Settings > API Keys"
+        },
+        {
+          "displayName": "Base URL",
+          "name": "baseUrl",
+          "type": "string",
+          "default": "https://app.custodia-privacy.com",
+          "description": "Your Custodia instance URL"
+        }
+      ],
+      "authenticate": {
+        "type": "generic",
+        "properties": {
+          "headers": {
+            "Authorization": "Bearer {{$credentials.apiKey}}"
+          }
+        }
+      }
+    }
+  ],
+  "resources": {
+    "triggers": [
+      {
+        "name": "dsarCreated",
+        "displayName": "DSAR Created",
+        "description": "Triggers when a new DSAR is submitted",
+        "webhookMethod": "POST",
+        "subscribeUrl": "{{$credentials.baseUrl}}/api/v1/zapier/triggers",
+        "subscribeBody": { "hookUrl": "{{$webhookUrl}}", "event": "dsar.created" },
+        "unsubscribeUrl": "{{$credentials.baseUrl}}/api/v1/zapier/triggers?id={{$hookId}}"
+      },
+      {
+        "name": "consentRecorded",
+        "displayName": "Consent Recorded",
+        "description": "Triggers when a visitor records consent",
+        "webhookMethod": "POST",
+        "subscribeUrl": "{{$credentials.baseUrl}}/api/v1/zapier/triggers",
+        "subscribeBody": { "hookUrl": "{{$webhookUrl}}", "event": "consent.recorded" },
+        "unsubscribeUrl": "{{$credentials.baseUrl}}/api/v1/zapier/triggers?id={{$hookId}}"
+      },
+      {
+        "name": "preferencesUpdated",
+        "displayName": "Preferences Updated",
+        "description": "Triggers when user preferences are created or updated",
+        "webhookMethod": "POST",
+        "subscribeUrl": "{{$credentials.baseUrl}}/api/v1/zapier/triggers",
+        "subscribeBody": { "hookUrl": "{{$webhookUrl}}", "event": "preferences.updated" },
+        "unsubscribeUrl": "{{$credentials.baseUrl}}/api/v1/zapier/triggers?id={{$hookId}}"
+      }
+    ],
+    "operations": [
+      {
+        "name": "createDsar",
+        "displayName": "Create DSAR",
+        "description": "Submit a new Data Subject Access Request",
+        "method": "POST",
+        "url": "={{$credentials.baseUrl}}/api/v1/zapier/actions?action=create_dsar",
+        "parameters": [
+          { "name": "request_type", "displayName": "Request Type", "type": "options", "required": true, "options": ["access", "deletion", "rectification", "portability", "opt_out", "restrict_processing"] },
+          { "name": "jurisdiction", "displayName": "Jurisdiction", "type": "string", "required": true },
+          { "name": "requester_name", "displayName": "Requester Name", "type": "string", "required": true },
+          { "name": "requester_email", "displayName": "Requester Email", "type": "string", "required": true },
+          { "name": "notes", "displayName": "Notes", "type": "string" }
+        ]
+      },
+      {
+        "name": "upsertPreferences",
+        "displayName": "Create/Update Preferences",
+        "description": "Upsert a subscriber's privacy preferences",
+        "method": "POST",
+        "url": "={{$credentials.baseUrl}}/api/v1/zapier/actions?action=upsert_preferences",
+        "parameters": [
+          { "name": "center_id", "displayName": "Preference Center ID", "type": "string", "required": true },
+          { "name": "email", "displayName": "Email", "type": "string" },
+          { "name": "external_id", "displayName": "External ID", "type": "string" },
+          { "name": "preferences", "displayName": "Preferences", "type": "json", "required": true }
+        ]
+      },
+      {
+        "name": "searchContact",
+        "displayName": "Search Contact",
+        "description": "Find a contact's DSARs and preferences by email",
+        "method": "POST",
+        "url": "={{$credentials.baseUrl}}/api/v1/zapier/actions?action=search_contact",
+        "parameters": [
+          { "name": "email", "displayName": "Email", "type": "string", "required": true }
+        ]
+      },
+      {
+        "name": "listDsars",
+        "displayName": "List DSARs",
+        "description": "Get a list of DSARs",
+        "method": "GET",
+        "url": "={{$credentials.baseUrl}}/api/v1/dsars"
+      },
+      {
+        "name": "listSites",
+        "displayName": "List Sites",
+        "description": "Get a list of monitored sites",
+        "method": "GET",
+        "url": "={{$credentials.baseUrl}}/api/v1/sites"
+      }
+    ]
+  }
+}

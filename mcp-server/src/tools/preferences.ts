@@ -10,7 +10,7 @@ export function registerPreferenceTools(server: McpServer, client: CustodiaClien
       siteId: z.string().uuid().optional().describe("Optional site ID to scope the preference center"),
     },
     async ({ siteId }) => {
-      const result = await client.query("preferenceCenter.get", { siteId });
+      const result = await client.query("preferences.getCenter", { siteId });
       return {
         content: [
           {
@@ -36,7 +36,7 @@ export function registerPreferenceTools(server: McpServer, client: CustodiaClien
         .describe("Source of the preference update"),
     },
     async ({ centerId, email, externalId, preferences, source }) => {
-      const result = await client.mutate("preferenceCenter.updateUserPreferences", {
+      const result = await client.mutate("preferences.updatePreferences", {
         centerId,
         email,
         externalId,

@@ -3,7 +3,9 @@
  * Payloads are JSON; verify with HMAC-SHA256 of the raw body using the stored secret.
  */
 import { createHmac, randomBytes } from "node:crypto";
+import { createLogger } from "./logger";
 
+const log = createLogger("privacy-webhook");
 const WEBHOOK_TIMEOUT_MS = 15_000;
 
 export function generatePrivacyWebhookSecret(): string {
@@ -14,13 +16,28 @@ export function signPrivacyWebhookPayload(secret: string, rawBody: string): stri
   return createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
 }
 
-/** Production: https only. Non-production: http allowed for local testing. */
+const BLOCKED_HOSTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  "[::1]",
+  "169.254.169.254",
+  "metadata.google.internal",
+]);
+
+/** Production: https only. Non-production: http allowed for local testing. Blocks SSRF targets. */
 export function isAllowedPrivacyWebhookUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    if (u.protocol === "https:") return true;
-    if (process.env.NODE_ENV !== "production" && u.protocol === "http:") return true;
-    return false;
+    if (process.env.NODE_ENV === "production") {
+      if (u.protocol !== "https:") return false;
+      if (BLOCKED_HOSTS.has(u.hostname)) return false;
+      if (u.hostname.endsWith(".internal") || u.hostname.endsWith(".local")) return false;
+      if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(u.hostname)) return false;
+    } else {
+      if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    }
+    return true;
   } catch {
     return false;
   }
@@ -48,12 +65,10 @@ export async function deliverPrivacyWebhook(params: {
       signal: ac.signal,
     });
     if (!res.ok) {
-      console.warn(
-        `[privacy-webhook] ${params.event} HTTP ${res.status} for ${params.url.slice(0, 80)}…`,
-      );
+      log.warn(`${params.event} HTTP ${res.status}`);
     }
   } catch (e) {
-    console.warn(`[privacy-webhook] ${params.event} delivery failed:`, e);
+    log.warn(`${params.event} delivery failed`, e);
   } finally {
     clearTimeout(t);
   }

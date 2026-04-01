@@ -1,0 +1,116 @@
+{
+  "name": "Custodia",
+  "label": "Custodia Privacy",
+  "description": "Privacy compliance automation — DSARs, consent, and preference management",
+  "version": "1.0.0",
+  "baseUrl": "{{connection.baseUrl}}/api/v1",
+  "authentication": {
+    "type": "apiKey",
+    "apiKey": {
+      "headerName": "Authorization",
+      "headerPrefix": "Bearer "
+    }
+  },
+  "modules": {
+    "triggers": [
+      {
+        "name": "watchDsars",
+        "label": "Watch New DSARs",
+        "description": "Triggers when a new DSAR is submitted",
+        "type": "webhook",
+        "webhook": {
+          "subscribe": {
+            "url": "{{baseUrl}}/zapier/triggers",
+            "method": "POST",
+            "body": { "hookUrl": "{{webhookUrl}}", "event": "dsar.created" }
+          },
+          "unsubscribe": {
+            "url": "{{baseUrl}}/zapier/triggers?id={{hookId}}",
+            "method": "DELETE"
+          }
+        },
+        "output": [
+          { "name": "id", "type": "text", "label": "DSAR ID" },
+          { "name": "request_type", "type": "text", "label": "Request Type" },
+          { "name": "status", "type": "text", "label": "Status" },
+          { "name": "requester_email", "type": "email", "label": "Requester Email" },
+          { "name": "jurisdiction", "type": "text", "label": "Jurisdiction" },
+          { "name": "due_date", "type": "date", "label": "Due Date" }
+        ]
+      },
+      {
+        "name": "watchConsent",
+        "label": "Watch Consent Events",
+        "description": "Triggers when a visitor records consent",
+        "type": "webhook",
+        "webhook": {
+          "subscribe": {
+            "url": "{{baseUrl}}/zapier/triggers",
+            "method": "POST",
+            "body": { "hookUrl": "{{webhookUrl}}", "event": "consent.recorded" }
+          },
+          "unsubscribe": {
+            "url": "{{baseUrl}}/zapier/triggers?id={{hookId}}",
+            "method": "DELETE"
+          }
+        }
+      },
+      {
+        "name": "watchPreferences",
+        "label": "Watch Preference Updates",
+        "description": "Triggers when user preferences are created or updated",
+        "type": "webhook",
+        "webhook": {
+          "subscribe": {
+            "url": "{{baseUrl}}/zapier/triggers",
+            "method": "POST",
+            "body": { "hookUrl": "{{webhookUrl}}", "event": "preferences.updated" }
+          },
+          "unsubscribe": {
+            "url": "{{baseUrl}}/zapier/triggers?id={{hookId}}",
+            "method": "DELETE"
+          }
+        }
+      }
+    ],
+    "actions": [
+      {
+        "name": "createDsar",
+        "label": "Create DSAR",
+        "description": "Submit a new Data Subject Access Request",
+        "url": "{{baseUrl}}/zapier/actions?action=create_dsar",
+        "method": "POST",
+        "parameters": [
+          { "name": "request_type", "type": "select", "label": "Request Type", "required": true, "options": ["access", "deletion", "rectification", "portability", "opt_out", "restrict_processing"] },
+          { "name": "jurisdiction", "type": "text", "label": "Jurisdiction", "required": true },
+          { "name": "requester_name", "type": "text", "label": "Requester Name", "required": true },
+          { "name": "requester_email", "type": "email", "label": "Requester Email", "required": true },
+          { "name": "notes", "type": "text", "label": "Notes" }
+        ]
+      },
+      {
+        "name": "upsertPreferences",
+        "label": "Create/Update Preferences",
+        "description": "Create or update a subscriber's privacy preferences",
+        "url": "{{baseUrl}}/zapier/actions?action=upsert_preferences",
+        "method": "POST",
+        "parameters": [
+          { "name": "center_id", "type": "text", "label": "Preference Center ID", "required": true },
+          { "name": "email", "type": "email", "label": "Email" },
+          { "name": "external_id", "type": "text", "label": "External ID" },
+          { "name": "preferences", "type": "object", "label": "Preferences", "required": true }
+        ]
+      },
+      {
+        "name": "searchContact",
+        "label": "Search Contact",
+        "description": "Search for a contact's DSARs and preferences by email",
+        "url": "{{baseUrl}}/zapier/actions?action=search_contact",
+        "method": "POST",
+        "parameters": [
+          { "name": "email", "type": "email", "label": "Email", "required": true }
+        ]
+      }
+    ]
+  }
+}

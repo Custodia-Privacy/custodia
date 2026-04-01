@@ -265,6 +265,7 @@ export const scanRouter = createRouter({
       z.object({
         siteId: z.string().uuid(),
         limit: z.number().min(1).max(100).default(20),
+        showResolved: z.boolean().default(false),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -276,7 +277,10 @@ export const scanRouter = createRouter({
       }
 
       const all = await ctx.db.finding.findMany({
-        where: { siteId: input.siteId },
+        where: {
+          siteId: input.siteId,
+          ...(!input.showResolved ? { resolvedAt: null } : {}),
+        },
         orderBy: [{ severity: "asc" }, { createdAt: "desc" }],
       });
 
@@ -287,5 +291,29 @@ export const scanRouter = createRouter({
       }
 
       return Array.from(seen.values()).slice(0, input.limit);
+    }),
+
+  /** Get finding resolution progress for a site */
+  progress: orgProcedure
+    .input(z.object({ siteId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const site = await ctx.db.site.findFirst({
+        where: { id: input.siteId, orgId: ctx.orgId, deletedAt: null },
+      });
+      if (!site) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Site not found" });
+      }
+
+      const [total, resolved] = await Promise.all([
+        ctx.db.finding.count({ where: { siteId: input.siteId } }),
+        ctx.db.finding.count({ where: { siteId: input.siteId, resolvedAt: { not: null } } }),
+      ]);
+
+      return {
+        total,
+        resolved,
+        open: total - resolved,
+        percentage: total > 0 ? Math.round((resolved / total) * 100) : 100,
+      };
     }),
 });

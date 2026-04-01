@@ -14,7 +14,7 @@ export const siteRouter = createRouter({
     const rows = await ctx.db.site.findMany({
       where: { orgId: ctx.orgId, deletedAt: null },
       include: {
-        _count: { select: { scans: true, findings: true } },
+        _count: { select: { scans: true, findings: { where: { resolvedAt: null } } } },
       },
       orderBy: { createdAt: "desc" },
     });

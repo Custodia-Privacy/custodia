@@ -12,7 +12,7 @@ export function registerPiaTools(server: McpServer, client: CustodiaClient) {
       description: z.string().optional().describe("Detailed description of the planned data processing activity"),
     },
     async ({ title, projectType, description }) => {
-      const result = await client.mutate("assessment.create", { title, projectType, description });
+      const result = await client.mutate("pia.create", { title, projectType, description });
       return {
         content: [
           {
@@ -31,7 +31,7 @@ export function registerPiaTools(server: McpServer, client: CustodiaClient) {
       assessmentId: z.string().uuid().describe("The UUID of the assessment"),
     },
     async ({ assessmentId }) => {
-      const result = await client.mutate("assessment.generateQuestions", { assessmentId });
+      const result = await client.mutate("pia.generateQuestions", { id: assessmentId });
       return {
         content: [
           {
@@ -51,7 +51,7 @@ export function registerPiaTools(server: McpServer, client: CustodiaClient) {
       answers: z.record(z.string(), z.string()).describe("Object mapping question IDs to answer strings"),
     },
     async ({ assessmentId, answers }) => {
-      const result = await client.mutate("assessment.submitAnswers", { assessmentId, answers });
+      const result = await client.mutate("pia.submitAnswers", { id: assessmentId, answers });
       return {
         content: [
           {
@@ -70,7 +70,7 @@ export function registerPiaTools(server: McpServer, client: CustodiaClient) {
       assessmentId: z.string().uuid().describe("The UUID of the assessment to analyze"),
     },
     async ({ assessmentId }) => {
-      const result = await client.mutate("assessment.analyze", { assessmentId });
+      const result = await client.mutate("pia.analyze", { id: assessmentId });
       return {
         content: [
           {
@@ -92,7 +92,7 @@ export function registerPiaTools(server: McpServer, client: CustodiaClient) {
         .describe("Filter by assessment status"),
     },
     async ({ status }) => {
-      const result = await client.query("assessment.list", { status });
+      const result = await client.query("pia.list", { status });
       return {
         content: [
           {
@@ -111,7 +111,7 @@ export function registerPiaTools(server: McpServer, client: CustodiaClient) {
       assessmentId: z.string().uuid().describe("The UUID of the assessment"),
     },
     async ({ assessmentId }) => {
-      const result = await client.query("assessment.get", { assessmentId });
+      const result = await client.query("pia.get", { id: assessmentId });
       return {
         content: [
           {

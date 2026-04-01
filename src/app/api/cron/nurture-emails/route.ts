@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/logger";
 
-const RESEND_API_KEY =
-  process.env.RESEND_API_KEY ?? "re_YsNHNZwU_Q67JnmxZABAhiqPUgMEb3NDC";
+const log = createLogger("nurture-emails");
+
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) throw new Error(`Missing required env var: ${name}`);
+  return val;
+}
+
 const RESEND_AUDIENCE_ID = "8a5e6694-1334-4c5c-b851-e5cd358b5fd1";
-const CRON_SECRET =
-  process.env.CRON_SECRET ?? "custodia-cron-secret-2026";
+// CRON_SECRET is resolved at request time to avoid build-time env requirement
+function getCronSecret() { return requireEnv("CRON_SECRET"); }
 
 // ─── Email bodies ────────────────────────────────────────────────────────────
 
@@ -88,7 +95,7 @@ async function fetchAllContacts(): Promise<ResendContact[]> {
     if (after) url.searchParams.set("after", after);
 
     const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
+      headers: { Authorization: `Bearer ${requireEnv("RESEND_API_KEY")}` },
     });
 
     if (!res.ok) {
@@ -120,7 +127,7 @@ async function sendNurtureEmail(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${RESEND_API_KEY}`,
+      Authorization: `Bearer ${requireEnv("RESEND_API_KEY")}`,
     },
     body: JSON.stringify({
       from: "Custodia <hello@custodia-privacy.com>",
@@ -133,7 +140,7 @@ async function sendNurtureEmail(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Resend send failed for ${email}: ${res.status} ${body}`);
+    throw new Error(`Resend send failed: ${res.status} ${body}`);
   }
 }
 
@@ -142,7 +149,7 @@ async function sendNurtureEmail(
 export async function POST(req: Request) {
   // Auth check
   const authHeader = req.headers.get("authorization") ?? "";
-  const expectedToken = `Bearer ${CRON_SECRET}`;
+  const expectedToken = `Bearer ${getCronSecret()}`;
   if (authHeader !== expectedToken) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -150,19 +157,17 @@ export async function POST(req: Request) {
   const day3DateStr = utcDateDaysAgo(3);
   const day7DateStr = utcDateDaysAgo(7);
 
-  console.log(
-    `[nurture-emails] Running. day3=${day3DateStr} day7=${day7DateStr}`,
-  );
+  log.info(`Running. day3=${day3DateStr} day7=${day7DateStr}`);
 
   let contacts: ResendContact[];
   try {
     contacts = await fetchAllContacts();
   } catch (err) {
-    console.error("[nurture-emails] Failed to fetch contacts:", err);
+    log.error("Failed to fetch contacts", err);
     return NextResponse.json({ error: "fetch_failed" }, { status: 500 });
   }
 
-  console.log(`[nurture-emails] Total contacts fetched: ${contacts.length}`);
+  log.info(`Total contacts fetched: ${contacts.length}`);
 
   // Build send tasks
   const tasks: Promise<void>[] = [];
@@ -174,9 +179,6 @@ export async function POST(req: Request) {
     const contactDate = contact.created_at.slice(0, 10);
 
     if (contactDate === day3DateStr) {
-      console.log(
-        `[nurture-emails] Queuing Day 3 email for ${contact.email}`,
-      );
       tasks.push(
         sendNurtureEmail(
           contact.email,
@@ -185,9 +187,6 @@ export async function POST(req: Request) {
         ),
       );
     } else if (contactDate === day7DateStr) {
-      console.log(
-        `[nurture-emails] Queuing Day 7 email for ${contact.email}`,
-      );
       tasks.push(
         sendNurtureEmail(
           contact.email,
@@ -208,10 +207,10 @@ export async function POST(req: Request) {
       sent++;
     } else {
       errors++;
-      console.error("[nurture-emails] Send error:", result.reason);
+      log.error("Send error", result.reason);
     }
   }
 
-  console.log(`[nurture-emails] Done. sent=${sent} errors=${errors}`);
+  log.info(`Done. sent=${sent} errors=${errors}`);
   return NextResponse.json({ sent, errors }, { status: 200 });
 }

@@ -22,7 +22,7 @@ Each agent runs asynchronously and can take seconds to minutes depending on comp
       input: z.record(z.string(), z.any()).optional().describe("Agent-specific input parameters (e.g. { siteId: '...' } for scanner, { dsarId: '...' } for dsar_processor)"),
     },
     async ({ agentType, input }) => {
-      const result = await client.mutate("agent.trigger", { agentType, input });
+      const result = await client.mutate("agents.trigger", { agentType, input });
       return {
         content: [
           {
@@ -41,7 +41,7 @@ Each agent runs asynchronously and can take seconds to minutes depending on comp
       runId: z.string().uuid().describe("The UUID of the agent run"),
     },
     async ({ runId }) => {
-      const result = await client.query("agent.getStatus", { runId });
+      const result = await client.query("agents.getRun", { runId });
       return {
         content: [
           {
@@ -68,7 +68,7 @@ Each agent runs asynchronously and can take seconds to minutes depending on comp
       limit: z.number().min(1).max(100).default(20).describe("Number of runs to return"),
     },
     async ({ agentType, status, limit }) => {
-      const result = await client.query("agent.listRuns", { agentType, status, limit });
+      const result = await client.query("agents.listRuns", { agentType, status, limit });
       return {
         content: [
           {

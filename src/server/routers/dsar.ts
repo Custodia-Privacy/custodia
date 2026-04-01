@@ -2,12 +2,8 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { createRouter, orgProcedure, publicProcedure } from "../trpc";
-import Anthropic from "@anthropic-ai/sdk";
 import { computeDsarDueDate } from "@/lib/dsar-deadlines";
-
-function getAI() {
-  return new Anthropic();
-}
+import { getAI, getAIModel, redactForPrompt } from "@/lib/ai";
 
 export const dsarRouter = createRouter({
   /** List all DSARs for the org, with optional status filter */
@@ -217,23 +213,31 @@ export const dsarRouter = createRouter({
       });
 
       const client = getAI();
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const completion = await client.chat.completions.create({
+        model: getAIModel(),
         max_tokens: 4000,
         messages: [
+          { role: "system", content: "You are a privacy compliance AI agent. Respond ONLY with valid JSON — no markdown fences." },
           {
             role: "user",
-            content: `You are a privacy compliance AI agent processing a Data Subject Access Request (DSAR).
+            content: (() => {
+              const redacted = redactForPrompt({
+                requesterName: dsar.requesterName,
+                requesterEmail: dsar.requesterEmail,
+                requesterPhone: dsar.requesterPhone,
+              });
+              const storeList = dataStores.map((ds) => `- ${ds.name} (${ds.type}, ${ds.provider ?? "self-hosted"}): sensitivity=${ds.sensitivity}, piiFields=${JSON.stringify(ds.piiFields)}, dataTypes=${JSON.stringify(ds.dataTypes)}`).join("\n") || "No data stores registered.";
+              return `Process this Data Subject Access Request (DSAR).
 
 REQUEST DETAILS:
 - Type: ${dsar.requestType}
-- Requester: ${dsar.requesterName} (${dsar.requesterEmail})
+- Requester: ${redacted.requesterName} (${redacted.requesterEmail})
 - Jurisdiction: ${dsar.jurisdiction}
 - Due Date: ${dsar.dueDate.toISOString()}
-- Notes: ${dsar.notes ?? "None"}
+- Notes: ${dsar.notes ? "[user-provided notes redacted for privacy]" : "None"}
 
 CONNECTED DATA STORES IN THIS ORGANIZATION:
-${dataStores.map((ds) => `- ${ds.name} (${ds.type}, ${ds.provider ?? "self-hosted"}): sensitivity=${ds.sensitivity}, piiFields=${JSON.stringify(ds.piiFields)}, dataTypes=${JSON.stringify(ds.dataTypes)}`).join("\n") || "No data stores registered."}
+${storeList}
 
 TASK:
 1. Identify which data stores likely contain personal data for this requester (search by email/name).
@@ -249,13 +253,13 @@ Respond in JSON format:
   "risks": ["..."],
   "fulfillmentPlan": [{ "step": 1, "action": "...", "deadline": "..." }],
   "estimatedEffort": "..."
-}`,
+}`;
+            })(),
           },
         ],
       });
 
-      const responseText =
-        message.content[0].type === "text" ? message.content[0].text : "";
+      const responseText = completion.choices[0]?.message?.content ?? "";
 
       let parsed: { dataLocations?: unknown; summary?: string } = {};
       try {

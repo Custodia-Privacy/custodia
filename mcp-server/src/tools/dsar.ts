@@ -14,7 +14,7 @@ export function registerDsarTools(server: McpServer, client: CustodiaClient) {
       limit: z.number().min(1).max(100).default(20).describe("Number of results to return"),
     },
     async ({ status, limit }) => {
-      const result = await client.query("dsar.list", { status, limit });
+      const result = await client.query("dsar.list", { status });
       return {
         content: [
           {
@@ -33,7 +33,7 @@ export function registerDsarTools(server: McpServer, client: CustodiaClient) {
       dsarId: z.string().uuid().describe("The UUID of the DSAR request"),
     },
     async ({ dsarId }) => {
-      const result = await client.query("dsar.get", { dsarId });
+      const result = await client.query("dsar.get", { id: dsarId });
       return {
         content: [
           {
@@ -52,7 +52,7 @@ export function registerDsarTools(server: McpServer, client: CustodiaClient) {
       dsarId: z.string().uuid().describe("The UUID of the DSAR request to process"),
     },
     async ({ dsarId }) => {
-      const result = await client.mutate("dsar.process", { dsarId });
+      const result = await client.mutate("dsar.process", { id: dsarId });
       return {
         content: [
           {
@@ -72,7 +72,7 @@ export function registerDsarTools(server: McpServer, client: CustodiaClient) {
       notes: z.string().optional().describe("Optional notes about the fulfillment (for audit trail)"),
     },
     async ({ dsarId, notes }) => {
-      const result = await client.mutate("dsar.fulfill", { dsarId, notes });
+      const result = await client.mutate("dsar.fulfill", { id: dsarId });
       return {
         content: [
           {
@@ -112,7 +112,7 @@ export function registerDsarTools(server: McpServer, client: CustodiaClient) {
       notes: z.string().optional().describe("Optional notes about why this status change was made — recorded in the audit trail"),
     },
     async ({ dsarId, status, notes }) => {
-      const result = await client.mutate("dsar.updateStatus", { dsarId, status, notes });
+      const result = await client.mutate("dsar.updateStatus", { id: dsarId, status, notes });
       return {
         content: [
           {
@@ -136,7 +136,7 @@ export function registerDsarTools(server: McpServer, client: CustodiaClient) {
       details: z.string().optional().describe("Additional details or context from the requester"),
     },
     async ({ requesterName, requesterEmail, type, details }) => {
-      const result = await client.mutate("dsar.create", { requesterName, requesterEmail, type, details });
+      const result = await client.mutate("dsar.create", { requesterName, requesterEmail, requestType: type, jurisdiction: "auto", notes: details });
       return {
         content: [
           {
