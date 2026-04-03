@@ -65,8 +65,10 @@ function dueLabelColor(dueDate: Date, status: string) {
 
 export default function DataRequestsPage() {
   const utils = api.useUtils();
-  const { data: sites } = api.site.list.useQuery();
-  const { data: list, isLoading } = api.dsar.list.useQuery({});
+  const { data: sitesData } = api.site.list.useQuery();
+  const sites = sitesData?.items ?? [];
+  const { data: listData, isLoading } = api.dsar.list.useQuery({});
+  const list = listData?.items ?? [];
   const { data: stats } = api.dsar.stats.useQuery();
   const [filter, setFilter] = useState<string>("all");
 
@@ -89,7 +91,7 @@ export default function DataRequestsPage() {
   const [origin, setOrigin] = useState("");
   useEffect(() => { setOrigin(typeof window !== "undefined" ? window.location.origin : ""); }, []);
 
-  const filtered = list?.filter((r) => {
+  const filtered = list.filter((r) => {
     if (filter === "all") return true;
     if (filter === "open") return !["fulfilled", "rejected"].includes(r.status);
     if (filter === "overdue") return !["fulfilled", "rejected"].includes(r.status) && new Date(r.dueDate) < new Date();

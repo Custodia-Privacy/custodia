@@ -20,7 +20,8 @@ function dataSharedSummary(raw: unknown): string {
 
 export default function VendorsPage() {
   const utils = api.useUtils();
-  const { data: vendors, isLoading } = api.governance.listVendors.useQuery();
+  const { data: vendorsData, isLoading } = api.governance.listVendors.useQuery();
+  const vendors = vendorsData?.items ?? [];
   const createVendor = api.governance.createVendor.useMutation({
     onSuccess: () => {
       void utils.governance.listVendors.invalidate();

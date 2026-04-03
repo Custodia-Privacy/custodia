@@ -10,9 +10,14 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN TURBOPACK=0 npm run build
 
-# ─── Stage 3: runner ──────────────────────────────────────────────────────────
+# ─── Stage 3: prisma-cli ─────────────────────────────────────────────────────
+FROM node:22-alpine AS prisma-cli
+WORKDIR /prisma-install
+RUN npm init -y && npm install prisma@6 --save-exact 2>/dev/null
+
+# ─── Stage 4: runner ──────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -25,11 +30,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Prisma: client + schema + migrations (needed for migrate deploy at startup)
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Prisma runtime client
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+
+# Prisma schema + migrations
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Prisma CLI with full dependency tree — isolated outside /app to avoid resolution conflicts
+COPY --from=prisma-cli /prisma-install/node_modules /opt/prisma/node_modules
 
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh

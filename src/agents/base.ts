@@ -6,6 +6,7 @@
  */
 import type OpenAI from "openai";
 import type { PrismaClient } from "@prisma/client";
+import { z } from "zod";
 import { getAI, getAIModel } from "@/lib/ai";
 
 export type LogLevel = "info" | "warn" | "error" | "debug";
@@ -126,6 +127,22 @@ export abstract class BaseAgent {
     const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     const raw = match ? match[1].trim() : text.trim();
     return JSON.parse(raw);
+  }
+
+  /** Parse AI JSON response with Zod validation, returning a fallback on failure. */
+  protected parseAIJson<T>(raw: string, schema: z.ZodType<T>, fallback: T): T {
+    try {
+      const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const cleaned = match ? match[1].trim() : raw.trim();
+      const parsed = JSON.parse(cleaned);
+      const result = schema.safeParse(parsed);
+      if (result.success) return result.data;
+      this.log("warn", `AI output validation failed: ${result.error.message}`);
+      return fallback;
+    } catch {
+      this.log("warn", "AI response is not valid JSON");
+      return fallback;
+    }
   }
 
   /** The agent's main execution logic — implemented by each subclass. */

@@ -55,6 +55,7 @@ export function CTA() {
           <input
             type="text"
             placeholder="https://your-website.com"
+            aria-label="Website URL"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="flex-1 rounded-xl border border-navy-700 bg-navy-900 px-4 py-3 text-sm text-white outline-none placeholder:text-navy-400 focus:border-navy-500 dark:bg-navy-800"

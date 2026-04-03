@@ -4,6 +4,8 @@ import { createRouter, orgProcedure, publicProcedure } from "../trpc";
 import { enqueueScan } from "@/lib/queue";
 import { PLANS } from "@/lib/stripe";
 import { runQuickScan } from "@/lib/quick-scanner";
+import { isSafeUrl, getClientIp } from "@/lib/ip-check";
+import { checkPublicRateLimit } from "@/lib/public-rate-limit";
 
 export const scanRouter = createRouter({
   /** List scans for a site (paginated) */
@@ -133,11 +135,25 @@ export const scanRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const clientIp = getClientIp(ctx.headers as unknown as Request);
+      const rl = checkPublicRateLimit(`quick-scan:${clientIp}`, 5, 60 * 60 * 1000);
+      if (!rl.ok) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: `Rate limited. Try again in ${rl.retryAfterSec}s.`,
+        });
+      }
+
       let domain: string;
       try {
         domain = new URL(input.url).hostname;
       } catch {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid URL" });
+      }
+
+      const scanUrl = `https://${domain}`;
+      if (!isSafeUrl(scanUrl)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "URL not allowed" });
       }
 
       // Quick scans use a sentinel org/site so the FK constraint is satisfied.
@@ -276,21 +292,17 @@ export const scanRouter = createRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Site not found" });
       }
 
-      const all = await ctx.db.finding.findMany({
+      const findings = await ctx.db.finding.findMany({
         where: {
           siteId: input.siteId,
           ...(!input.showResolved ? { resolvedAt: null } : {}),
         },
+        distinct: ['title', 'category'],
         orderBy: [{ severity: "asc" }, { createdAt: "desc" }],
+        take: input.limit,
       });
 
-      const seen = new Map<string, typeof all[0]>();
-      for (const f of all) {
-        const key = `${f.title}::${f.category}`;
-        if (!seen.has(key)) seen.set(key, f);
-      }
-
-      return Array.from(seen.values()).slice(0, input.limit);
+      return findings;
     }),
 
   /** Get finding resolution progress for a site */

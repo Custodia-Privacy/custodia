@@ -6,6 +6,7 @@ import {
   generatePrivacyWebhookSecret,
   isAllowedPrivacyWebhookUrl,
 } from "@/lib/privacy-webhook";
+import { checkPublicRateLimit } from "@/lib/public-rate-limit";
 
 function stripCenterWebhookSecrets<T extends { privacyWebhookSecret?: string | null }>(center: T) {
   const { privacyWebhookSecret: _s, ...rest } = center;
@@ -17,17 +18,37 @@ function stripCenterWebhookSecrets<T extends { privacyWebhookSecret?: string | n
 
 export const preferencesRouter = createRouter({
   /** List all preference centers for the organization */
-  listCenters: orgProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db.preferenceCenter.findMany({
-      where: { orgId: ctx.orgId },
-      include: {
-        _count: { select: { preferences: true } },
-        site: { select: { id: true, domain: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return rows.map((c) => stripCenterWebhookSecrets(c));
-  }),
+  listCenters: orgProcedure
+    .input(
+      z
+        .object({
+          cursor: z.string().uuid().optional(),
+          limit: z.number().min(1).max(50).default(20),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 20;
+
+      const rows = await ctx.db.preferenceCenter.findMany({
+        where: { orgId: ctx.orgId },
+        include: {
+          _count: { select: { preferences: true } },
+          site: { select: { id: true, domain: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        ...(input?.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      });
+
+      let nextCursor: string | null = null;
+      if (rows.length > limit) {
+        const lastItem = rows.pop()!;
+        nextCursor = lastItem.id;
+      }
+
+      return { items: rows.map((c) => stripCenterWebhookSecrets(c)), nextCursor };
+    }),
 
   /** Get a single preference center with subscription stats */
   getCenter: orgProcedure
@@ -341,6 +362,21 @@ export const preferencesRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const ip =
+        ctx.headers.get("cf-connecting-ip") ||
+        ctx.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        "unknown";
+
+      const ipLimit = checkPublicRateLimit(`pref-update:ip:${ip}`, 30, 60 * 60 * 1000);
+      if (!ipLimit.ok) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many requests. Please try again later." });
+      }
+
+      const centerLimit = checkPublicRateLimit(`pref-update:center:${input.centerId}`, 100, 60 * 60 * 1000);
+      if (!centerLimit.ok) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many requests. Please try again later." });
+      }
+
       if (!input.email && !input.externalId) {
         throw new TRPCError({
           code: "BAD_REQUEST",

@@ -49,19 +49,31 @@ export const piaRouter = createRouter({
             "archived",
           ])
           .optional(),
+        cursor: z.string().uuid().optional(),
+        limit: z.number().min(1).max(100).default(20),
       }).default({}),
     )
     .query(async ({ ctx, input }) => {
-      return ctx.db.assessment.findMany({
+      const items = await ctx.db.assessment.findMany({
         where: {
           orgId: ctx.orgId,
           ...(input.status ? { status: input.status } : {}),
         },
         orderBy: { createdAt: "desc" },
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
         include: {
           assignedTo: { select: { id: true, email: true, name: true } },
         },
       });
+
+      let nextCursor: string | null = null;
+      if (items.length > input.limit) {
+        const lastItem = items.pop()!;
+        nextCursor = lastItem.id;
+      }
+
+      return { items, nextCursor };
     }),
 
   /** Get a single assessment by ID */

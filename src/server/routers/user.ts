@@ -174,22 +174,31 @@ export const userRouter = createRouter({
     }),
 
   /** List all team members in the org */
-  listTeamMembers: protectedProcedure.query(async ({ ctx }) => {
-    const membership = await ctx.db.orgMember.findFirst({
-      where: { userId: ctx.userId },
-    });
-    if (!membership) return [];
+  listTeamMembers: protectedProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().min(1).max(200).default(50),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const membership = await ctx.db.orgMember.findFirst({
+        where: { userId: ctx.userId },
+      });
+      if (!membership) return [];
 
-    return ctx.db.orgMember.findMany({
-      where: { orgId: membership.orgId },
-      include: {
-        user: {
-          select: { id: true, email: true, name: true, image: true },
+      return ctx.db.orgMember.findMany({
+        where: { orgId: membership.orgId },
+        include: {
+          user: {
+            select: { id: true, email: true, name: true, image: true },
+          },
         },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-  }),
+        orderBy: { createdAt: "asc" },
+        take: input?.limit ?? 50,
+      });
+    }),
 
   /** Create a new organization (for first-time users) */
   createOrg: protectedProcedure

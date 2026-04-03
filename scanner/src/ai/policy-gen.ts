@@ -2,7 +2,7 @@
  * AI Privacy Policy Generator — uses Claude to generate a customized
  * privacy policy based on actual scan results.
  */
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 interface PolicyGenInput {
   domain: string;
@@ -20,19 +20,18 @@ export interface GeneratedPolicy {
   sections: string[];
 }
 
-const client = new OpenAI({
-  apiKey: process.env.ZHIPUAI_API_KEY,
-  baseURL: "https://open.bigmodel.cn/api/paas/v4",
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 export async function generatePrivacyPolicy(
   input: PolicyGenInput,
 ): Promise<GeneratedPolicy> {
-  const completion = await client.chat.completions.create({
-    model: "glm-4.5-flash",
+  const message = await client.messages.create({
+    model: "claude-haiku-4-5",
     max_tokens: 4000,
+    system: "You are a privacy policy expert. Output Markdown only — no code fences.",
     messages: [
-      { role: "system", content: "You are a privacy policy expert. Output Markdown only — no code fences." },
       {
         role: "user",
         content: `Generate a comprehensive privacy policy for ${input.domain} (${input.companyName}).
@@ -60,7 +59,7 @@ Output ONLY the privacy policy in Markdown format.`,
     ],
   });
 
-  const markdown = completion.choices[0]?.message?.content ?? "";
+  const markdown = message.content[0]?.type === "text" ? message.content[0].text : "";
 
   // Extract section headings
   const sections = (markdown.match(/^#{1,3}\s+(.+)$/gm) ?? []).map((h) =>

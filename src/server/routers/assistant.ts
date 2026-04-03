@@ -186,7 +186,7 @@ export const assistantRouter = createRouter({
 
       const dsars = await ctx.db.dsarRequest.findMany({
         where: { orgId: ctx.orgId, status: { notIn: ["fulfilled", "rejected"] } },
-        select: { id: true, requesterName: true, requesterEmail: true, requestType: true, status: true, dueDate: true },
+        select: { id: true, requestType: true, status: true, dueDate: true, jurisdiction: true },
         orderBy: { dueDate: "asc" },
         take: 20,
       });
@@ -203,7 +203,7 @@ export const assistantRouter = createRouter({
 
       const dsarLines =
         dsars.length > 0
-          ? dsars.map((d) => `id=${d.id} name=${d.requesterName} email=${d.requesterEmail} type=${d.requestType} status=${d.status} due=${d.dueDate.toISOString().slice(0, 10)}`).join("\n")
+          ? dsars.map((d) => `id=${d.id} name=[redacted] email=[redacted] type=${d.requestType} status=${d.status} due=${d.dueDate.toISOString().slice(0, 10)} jurisdiction=${d.jurisdiction}`).join("\n")
           : "(no open requests)";
 
       const systemPrompt = [
@@ -290,7 +290,7 @@ export const assistantRouter = createRouter({
             const status = String(inputObj.status ?? "").trim();
             if (!dsarId || !status) continue;
             const dsar = dsars.find((d) => d.id === dsarId);
-            proposals.push({ id, tool: "propose_update_dsar_status", input: { id: dsarId, status, notes: inputObj.notes ? String(inputObj.notes) : undefined }, label: dsar ? `Move ${dsar.requesterName}'s request → ${status}` : `Update request → ${status}` });
+            proposals.push({ id, tool: "propose_update_dsar_status", input: { id: dsarId, status, notes: inputObj.notes ? String(inputObj.notes) : undefined }, label: dsar ? `Move ${dsar.requestType} request → ${status}` : `Update request → ${status}` });
           } else if (call.function.name === "propose_generate_policy") {
             const siteId = String(inputObj.siteId ?? "").trim();
             const policyType = String(inputObj.type ?? "privacy_policy").trim();

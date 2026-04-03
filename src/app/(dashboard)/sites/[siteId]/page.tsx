@@ -7,6 +7,17 @@ import { api } from "@/lib/trpc";
 import { formatRelativeTime } from "@/lib/format-relative";
 
 type Tab = "overview" | "scans" | "banner" | "policy";
+type FindingWithResolved = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  severity: string;
+  recommendation: string | null;
+  resolvedAt: Date | string | null;
+  pageUrl: string | null;
+  details: Record<string, unknown> | null;
+};
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -71,9 +82,11 @@ export default function SiteDetailPage() {
   }, [router, siteId]);
 
   const [expandedScan, setExpandedScan] = useState<string | null>(null);
+  const [showResolved, setShowResolved] = useState(false);
 
   const { data: site, isLoading: siteLoading, error: siteError } = api.site.get.useQuery({ siteId }, { enabled: !!siteId });
-  const { data: findings } = api.scan.recentFindings.useQuery({ siteId, limit: 50 }, { enabled: !!siteId && activeTab === "overview" });
+  const { data: findings } = api.scan.recentFindings.useQuery({ siteId, limit: 50, showResolved }, { enabled: !!siteId && activeTab === "overview" });
+  const { data: progress } = api.scan.progress.useQuery({ siteId }, { enabled: !!siteId && activeTab === "overview" });
   const { data: scansData } = api.scan.list.useQuery(
     { siteId, limit: 50 },
     {
@@ -161,14 +174,18 @@ export default function SiteDetailPage() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           {/* Stats */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-xs text-slate-500 dark:text-slate-400">Risk Score</p>
               <p className={`mt-1 text-2xl font-bold ${scoreColor(score)}`}>{score ?? "—"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-xs text-slate-500 dark:text-slate-400">Open Findings</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{site._count.findings}</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{progress?.open ?? site._count.findings}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Resolved</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{progress?.resolved ?? 0}</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-xs text-slate-500 dark:text-slate-400">Banner</p>
@@ -178,39 +195,65 @@ export default function SiteDetailPage() {
             </div>
           </div>
 
+          {/* Resolution progress */}
+          {progress && progress.total > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Compliance Progress</h2>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{progress.percentage}%</span>
+              </div>
+              <div className="h-2.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
+                <div
+                  className={`h-2.5 rounded-full transition-all duration-500 ${
+                    progress.percentage >= 80 ? "bg-emerald-500" : progress.percentage >= 50 ? "bg-amber-500" : "bg-red-500"
+                  }`}
+                  style={{ width: `${progress.percentage}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                {progress.resolved} of {progress.total} finding{progress.total !== 1 ? "s" : ""} resolved
+              </p>
+            </div>
+          )}
+
+          {/* Policy gap auto-fix */}
+          {findings && findings.some((f) => f.category === "policy" && f.title.startsWith("Privacy policy gap:") && !f.resolvedAt) && (
+            <PolicyGapFixBanner findings={findings as FindingWithResolved[]} siteId={siteId} />
+          )}
+
           {/* Recent findings */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Recent Findings</h2>
-              <button
-                type="button"
-                onClick={() => setTab("scans")}
-                className="text-xs text-navy-600 hover:underline dark:text-navy-400"
-              >
-                View all scans
-              </button>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                {showResolved ? "All Findings" : "Open Findings"}
+              </h2>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showResolved}
+                    onChange={(e) => setShowResolved(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-navy-600 focus:ring-navy-500 dark:border-slate-600"
+                  />
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Show resolved</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setTab("scans")}
+                  className="text-xs text-navy-600 hover:underline dark:text-navy-400"
+                >
+                  View all scans
+                </button>
+              </div>
             </div>
             {!findings?.length ? (
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                No findings yet. Run a scan to detect privacy issues.
+                {showResolved ? "No findings yet. Run a scan to detect privacy issues." : "All findings resolved! Great work."}
               </p>
             ) : (
               <div className="space-y-2">
-                {findings.slice(0, 10).map((f) => (
-                  <div key={f.id} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 dark:border-slate-800">
-                    <span className={`mt-0.5 inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${severityColor(f.severity)}`}>
-                      {severityLabel(f.severity)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-slate-900 dark:text-white">{f.title}</p>
-                      {f.description && (
-                        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">{f.description}</p>
-                      )}
-                    </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${categoryColor(f.category)}`}>
-                      {categoryLabel(f.category)}
-                    </span>
-                  </div>
+                {findings.slice(0, 20).map((f) => (
+                  <FindingRow key={f.id} finding={f as FindingWithResolved} siteId={siteId} />
                 ))}
               </div>
             )}
@@ -273,6 +316,7 @@ export default function SiteDetailPage() {
                 <ScanRow
                   key={scan.id}
                   scan={scan}
+                  siteId={siteId}
                   isExpanded={expandedScan === scan.id}
                   onToggle={() => setExpandedScan(expandedScan === scan.id ? null : scan.id)}
                 />
@@ -381,9 +425,258 @@ export default function SiteDetailPage() {
   );
 }
 
+/* ---------- Policy gap auto-fix banner ---------- */
+function PolicyGapFixBanner({ findings, siteId }: { findings: FindingWithResolved[]; siteId: string }) {
+  const router = useRouter();
+  const utils = api.useUtils();
+  const fixGaps = api.policy.fixGaps.useMutation({
+    onSuccess: () => {
+      void utils.scan.recentFindings.invalidate({ siteId });
+      void utils.scan.progress.invalidate({ siteId });
+      void utils.site.get.invalidate({ siteId });
+    },
+  });
+
+  const policyGaps = findings.filter(
+    (f) => f.category === "policy" && f.title.startsWith("Privacy policy gap:") && !f.resolvedAt,
+  );
+
+  if (policyGaps.length === 0) return null;
+
+  const gaps = policyGaps.map((f) => {
+    const details = f.details as { gapTopic?: string } | null;
+    return {
+      topic: details?.gapTopic ?? f.title.replace("Privacy policy gap: ", ""),
+      description: f.description,
+      recommendation: f.recommendation ?? "Address this gap in your privacy policy.",
+    };
+  });
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5 dark:border-amber-900/50 dark:bg-amber-950/10">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <svg className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {policyGaps.length} privacy policy gap{policyGaps.length !== 1 ? "s" : ""} detected
+            </p>
+          </div>
+          <p className="text-xs text-amber-700/80 dark:text-amber-400/70">
+            Your privacy policy is missing coverage for: {gaps.map((g) => g.topic).join(", ")}.
+            Custodia can automatically update your policy to address {policyGaps.length === 1 ? "this gap" : "these gaps"}.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            disabled={fixGaps.isPending}
+            onClick={() => fixGaps.mutate({ siteId, gaps })}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-600"
+          >
+            {fixGaps.isPending ? "Updating Policy..." : "Auto-fix Policy"}
+          </button>
+        </div>
+      </div>
+      {fixGaps.isSuccess && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 p-2.5 dark:bg-emerald-950/30">
+          <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+            Policy updated and gaps resolved!{" "}
+            <button
+              type="button"
+              onClick={() => router.push(`/sites/${siteId}?tab=policy`)}
+              className="font-medium underline hover:no-underline"
+            >
+              Review the updated policy
+            </button>
+          </p>
+        </div>
+      )}
+      {fixGaps.error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{fixGaps.error.message}</p>
+      )}
+    </div>
+  );
+}
+
+/* ---------- AI Summary block ---------- */
+function ScanSummaryBlock({ summary }: { summary: unknown }) {
+  const s = summary as { overview?: string; keyFindings?: string[]; complianceRisks?: string[]; recommendations?: string[] } | null;
+  if (!s || typeof s !== "object") return null;
+
+  // Handle case where summary is a plain string (quick scans store a different shape)
+  if (typeof summary === "string") {
+    return (
+      <div className="px-5 py-3 bg-navy-50/30 dark:bg-navy-950/20">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-navy-600 dark:text-navy-400 mb-1">AI Summary</p>
+        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{summary}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-5 py-4 bg-navy-50/30 dark:bg-navy-950/20 space-y-3">
+      <p className="text-[10px] font-medium uppercase tracking-wider text-navy-600 dark:text-navy-400">AI Summary</p>
+      {s.overview && (
+        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{s.overview}</p>
+      )}
+      {s.keyFindings && s.keyFindings.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Key Findings</p>
+          <ul className="space-y-0.5">
+            {s.keyFindings.map((f, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-navy-400" />
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {s.complianceRisks && s.complianceRisks.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-red-600 dark:text-red-400 mb-1">Compliance Risks</p>
+          <ul className="space-y-0.5">
+            {s.complianceRisks.map((r, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-[11px] text-red-600/80 dark:text-red-400/80">
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {s.recommendations && s.recommendations.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Recommendations</p>
+          <ul className="space-y-0.5">
+            {s.recommendations.map((r, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Finding row with resolve/unresolve ---------- */
+function FindingRow({ finding, siteId }: { finding: FindingWithResolved; siteId: string }) {
+  const utils = api.useUtils();
+  const resolveMutation = api.finding.resolve.useMutation({
+    onSuccess: () => {
+      void utils.scan.recentFindings.invalidate({ siteId });
+      void utils.scan.progress.invalidate({ siteId });
+      void utils.site.get.invalidate({ siteId });
+    },
+  });
+  const unresolveMutation = api.finding.unresolve.useMutation({
+    onSuccess: () => {
+      void utils.scan.recentFindings.invalidate({ siteId });
+      void utils.scan.progress.invalidate({ siteId });
+      void utils.site.get.invalidate({ siteId });
+    },
+  });
+  const fixGap = api.policy.fixGaps.useMutation({
+    onSuccess: () => {
+      void utils.scan.recentFindings.invalidate({ siteId });
+      void utils.scan.progress.invalidate({ siteId });
+      void utils.site.get.invalidate({ siteId });
+    },
+  });
+
+  const isResolved = !!finding.resolvedAt;
+  const isPending = resolveMutation.isPending || unresolveMutation.isPending;
+  const isPolicyGap = finding.category === "policy" && finding.title.startsWith("Privacy policy gap:");
+
+  return (
+    <div className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+      isResolved
+        ? "border-emerald-100 bg-emerald-50/30 dark:border-emerald-900/30 dark:bg-emerald-950/10"
+        : "border-slate-100 dark:border-slate-800"
+    }`}>
+      <span className={`mt-0.5 inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+        isResolved ? "bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800" : severityColor(finding.severity)
+      }`}>
+        {isResolved ? "Resolved" : severityLabel(finding.severity)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-xs font-medium ${isResolved ? "text-slate-500 line-through dark:text-slate-500" : "text-slate-900 dark:text-white"}`}>
+          {finding.title}
+        </p>
+        {finding.description && !isResolved && (
+          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">{finding.description}</p>
+        )}
+        {finding.recommendation && !isResolved && (
+          <p className="mt-1 text-[11px] text-navy-600 dark:text-navy-400">
+            <span className="font-medium">Action:</span> {finding.recommendation}
+          </p>
+        )}
+        {fixGap.error && (
+          <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{fixGap.error.message}</p>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${categoryColor(finding.category)}`}>
+          {categoryLabel(finding.category)}
+        </span>
+        {isPolicyGap && !isResolved && (
+          <button
+            type="button"
+            disabled={fixGap.isPending}
+            onClick={() => {
+              const details = finding.details as { gapTopic?: string } | null;
+              fixGap.mutate({
+                siteId,
+                gaps: [{
+                  topic: details?.gapTopic ?? finding.title.replace("Privacy policy gap: ", ""),
+                  description: finding.description,
+                  recommendation: finding.recommendation ?? "Address this gap in your privacy policy.",
+                }],
+              });
+            }}
+            title="Auto-fix this gap in the privacy policy"
+            className="rounded-lg border border-amber-200 px-2.5 py-1 text-[10px] font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/30"
+          >
+            {fixGap.isPending ? "Fixing..." : "Fix in Policy"}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => {
+            if (isResolved) {
+              unresolveMutation.mutate({ findingId: finding.id });
+            } else {
+              resolveMutation.mutate({ findingId: finding.id });
+            }
+          }}
+          title={isResolved ? "Reopen this finding" : "Mark as resolved"}
+          className={`rounded-lg border px-2.5 py-1 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+            isResolved
+              ? "border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+              : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+          }`}
+        >
+          {isPending ? "..." : isResolved ? "Reopen" : "Resolve"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Expandable scan row ---------- */
-function ScanRow({ scan, isExpanded, onToggle }: {
+function ScanRow({ scan, siteId, isExpanded, onToggle }: {
   scan: { id: string; status: string; scanType: string; summary: unknown; completedAt: Date | null; startedAt: Date | null; createdAt: Date; _count?: { findings: number } };
+  siteId: string;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
@@ -470,38 +763,121 @@ function ScanRow({ scan, isExpanded, onToggle }: {
 
               {/* AI Summary */}
               {detail.summary && (
-                <div className="px-5 py-3 bg-navy-50/30 dark:bg-navy-950/20">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-navy-600 dark:text-navy-400 mb-1">AI Summary</p>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{String(detail.summary)}</p>
-                </div>
+                <ScanSummaryBlock summary={detail.summary} />
               )}
 
               {/* Findings list */}
               {detail.findings.map((f) => (
-                <div key={f.id} className="flex items-start gap-3 px-5 py-3">
-                  <span className={`mt-0.5 inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${severityColor(f.severity)}`}>
-                    {severityLabel(f.severity)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-slate-900 dark:text-white">{f.title}</p>
-                    {f.description && (
-                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{f.description}</p>
-                    )}
-                    {f.recommendation && (
-                      <p className="mt-1 text-[11px] text-navy-600 dark:text-navy-400">
-                        <span className="font-medium">Fix:</span> {f.recommendation}
-                      </p>
-                    )}
-                  </div>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${categoryColor(f.category)}`}>
-                    {categoryLabel(f.category)}
-                  </span>
-                </div>
+                <ScanFindingRow key={f.id} finding={f as FindingWithResolved} siteId={siteId} scanId={scan.id} />
               ))}
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------- Finding row inside expanded scan ---------- */
+function ScanFindingRow({ finding, siteId, scanId }: { finding: FindingWithResolved; siteId: string; scanId: string }) {
+  const utils = api.useUtils();
+  const resolveMutation = api.finding.resolve.useMutation({
+    onSuccess: () => {
+      void utils.scan.get.invalidate({ scanId });
+      void utils.scan.recentFindings.invalidate({ siteId });
+      void utils.scan.progress.invalidate({ siteId });
+      void utils.site.get.invalidate({ siteId });
+    },
+  });
+  const unresolveMutation = api.finding.unresolve.useMutation({
+    onSuccess: () => {
+      void utils.scan.get.invalidate({ scanId });
+      void utils.scan.recentFindings.invalidate({ siteId });
+      void utils.scan.progress.invalidate({ siteId });
+      void utils.site.get.invalidate({ siteId });
+    },
+  });
+  const fixGap = api.policy.fixGaps.useMutation({
+    onSuccess: () => {
+      void utils.scan.get.invalidate({ scanId });
+      void utils.scan.recentFindings.invalidate({ siteId });
+      void utils.scan.progress.invalidate({ siteId });
+      void utils.site.get.invalidate({ siteId });
+    },
+  });
+
+  const isResolved = !!finding.resolvedAt;
+  const isPending = resolveMutation.isPending || unresolveMutation.isPending;
+  const isPolicyGap = finding.category === "policy" && finding.title.startsWith("Privacy policy gap:");
+
+  return (
+    <div className={`flex items-start gap-3 px-5 py-3 ${isResolved ? "bg-emerald-50/20 dark:bg-emerald-950/10" : ""}`}>
+      <span className={`mt-0.5 inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+        isResolved ? "bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800" : severityColor(finding.severity)
+      }`}>
+        {isResolved ? "Resolved" : severityLabel(finding.severity)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-xs font-medium ${isResolved ? "text-slate-500 line-through dark:text-slate-500" : "text-slate-900 dark:text-white"}`}>
+          {finding.title}
+        </p>
+        {finding.description && !isResolved && (
+          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{finding.description}</p>
+        )}
+        {finding.recommendation && !isResolved && (
+          <p className="mt-1 text-[11px] text-navy-600 dark:text-navy-400">
+            <span className="font-medium">Fix:</span> {finding.recommendation}
+          </p>
+        )}
+        {fixGap.error && (
+          <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{fixGap.error.message}</p>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${categoryColor(finding.category)}`}>
+          {categoryLabel(finding.category)}
+        </span>
+        {isPolicyGap && !isResolved && (
+          <button
+            type="button"
+            disabled={fixGap.isPending}
+            onClick={() => {
+              const details = finding.details as { gapTopic?: string } | null;
+              fixGap.mutate({
+                siteId,
+                gaps: [{
+                  topic: details?.gapTopic ?? finding.title.replace("Privacy policy gap: ", ""),
+                  description: finding.description,
+                  recommendation: finding.recommendation ?? "Address this gap in your privacy policy.",
+                }],
+              });
+            }}
+            title="Auto-fix this gap in the privacy policy"
+            className="rounded-lg border border-amber-200 px-2.5 py-1 text-[10px] font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/30"
+          >
+            {fixGap.isPending ? "Fixing..." : "Fix in Policy"}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => {
+            if (isResolved) {
+              unresolveMutation.mutate({ findingId: finding.id });
+            } else {
+              resolveMutation.mutate({ findingId: finding.id });
+            }
+          }}
+          title={isResolved ? "Reopen this finding" : "Mark as resolved"}
+          className={`rounded-lg border px-2.5 py-1 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+            isResolved
+              ? "border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+              : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+          }`}
+        >
+          {isPending ? "..." : isResolved ? "Reopen" : "Resolve"}
+        </button>
+      </div>
     </div>
   );
 }

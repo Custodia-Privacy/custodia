@@ -126,7 +126,7 @@ model Organization {
 model AuditLog {
   id           String   @id @default(uuid()) @db.Uuid
   orgId        String   @map("org_id") @db.Uuid
-  userId       String   @map("user_id") @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
   action       String   @db.VarChar(100)
   source       String   @default("assistant") @db.VarChar(50)
   payload      Json?
@@ -135,7 +135,7 @@ model AuditLog {
   createdAt    DateTime @default(now()) @map("created_at")
 
   org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([orgId, createdAt(sort: Desc)])
   @@map("audit_logs")
@@ -152,6 +152,7 @@ model OrgMember {
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, userId])
+  @@index([userId])
   @@map("org_members")
 }
 
@@ -214,6 +215,7 @@ model Site {
   preferenceCenters PreferenceCenter[]
 
   @@unique([orgId, domain])
+  @@index([orgId, deletedAt])
   @@map("sites")
 }
 
@@ -250,6 +252,7 @@ model Scan {
   policyVersions PolicyVersion[]
 
   @@index([siteId, createdAt(sort: Desc)])
+  @@index([siteId, status])
   @@map("scans")
 }
 
@@ -289,8 +292,10 @@ model Finding {
   scan Scan @relation(fields: [scanId], references: [id], onDelete: Cascade)
   site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
+  @@index([scanId])
   @@index([siteId, category])
   @@index([siteId, severity])
+  @@index([siteId, resolvedAt])
   @@map("findings")
 }
 
@@ -361,11 +366,10 @@ model Policy {
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
   site        Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  basedOnScan Scan?           @relation(fields: [basedOnScanId], references: [id])
+  basedOnScan Scan?           @relation(fields: [basedOnScanId], references: [id], onDelete: SetNull)
   versions    PolicyVersion[]
 
   @@unique([siteId, type])
-  @@index([siteId])
   @@map("policies")
 }
 
@@ -381,7 +385,7 @@ model PolicyVersion {
   createdAt       DateTime  @default(now()) @map("created_at")
 
   policy      Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  basedOnScan Scan?  @relation(fields: [basedOnScanId], references: [id])
+  basedOnScan Scan?  @relation(fields: [basedOnScanId], references: [id], onDelete: SetNull)
 
   @@index([policyId, version(sort: Desc)])
   @@map("policy_versions")
@@ -473,7 +477,7 @@ model DsarRequest {
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
   org        Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  site       Site?          @relation(fields: [siteId], references: [id])
+  site       Site?          @relation(fields: [siteId], references: [id], onDelete: SetNull)
   activities DsarActivity[]
 
   @@index([orgId, status])
@@ -644,6 +648,7 @@ model DataFlow {
   target DataStore    @relation("targetFlows", fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([sourceId, targetId])
+  @@index([orgId])
   @@map("data_flows")
 }
 
@@ -692,9 +697,10 @@ model PreferenceCenter {
   privacyWebhookSecret String? @map("privacy_webhook_secret") @db.VarChar(255)
 
   org         Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  site        Site?            @relation(fields: [siteId], references: [id])
+  site        Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
   preferences UserPreference[]
 
+  @@index([orgId])
   @@map("preference_centers")
 }
 
@@ -712,6 +718,7 @@ model UserPreference {
 
   center PreferenceCenter @relation(fields: [centerId], references: [id], onDelete: Cascade)
 
+  @@unique([centerId, emailHash])
   @@index([centerId, emailHash])
   @@index([centerId, externalIdHash])
   @@map("user_preferences")

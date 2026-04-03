@@ -15,6 +15,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
@@ -41,8 +46,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+    shm_size: 512m
     healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
+      test: ["CMD", "node", "-e", "const r=require('ioredis');new r(process.env.REDIS_URL||'redis://redis:6379').ping().then(()=>process.exit(0)).catch(()=>process.exit(1))"]
       interval: 60s
       timeout: 10s
       retries: 3
@@ -67,6 +78,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-custodia}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-custodia_dev}
       POSTGRES_DB: ${POSTGRES_DB:-custodia}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-custodia} -d ${POSTGRES_DB:-custodia}"]
       interval: 10s
@@ -88,7 +103,11 @@ services:
       - "127.0.0.1:6380:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-custodia_redis_dev}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-custodia_redis_dev} --maxmemory 200mb --maxmemory-policy noeviction
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-custodia_redis_dev}", "ping"]
       interval: 10s

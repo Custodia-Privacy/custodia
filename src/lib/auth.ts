@@ -92,15 +92,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
       }
-      const membership = await db.orgMember.findFirst({
-        where: { userId: token.id as string },
-        include: { org: true },
-        orderBy: { createdAt: "asc" },
-      });
-      if (membership) {
-        token.orgId = membership.orgId;
-        token.orgRole = membership.role;
-        token.orgSlug = membership.org.slug;
+      if (trigger === "signIn" || trigger === "update" || !token.orgId) {
+        const membership = await db.orgMember.findFirst({
+          where: { userId: token.id as string },
+          include: { org: true },
+          orderBy: { createdAt: "asc" },
+        });
+        if (membership) {
+          token.orgId = membership.orgId;
+          token.orgRole = membership.role;
+          token.orgSlug = membership.org.slug;
+        }
       }
       return token;
     },

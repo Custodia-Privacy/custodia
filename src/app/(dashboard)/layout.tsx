@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { DashboardAppShell } from "@/components/dashboard/dashboard-app-shell";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "App — Custodia",
 };

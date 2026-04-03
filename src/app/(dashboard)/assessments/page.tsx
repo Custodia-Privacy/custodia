@@ -102,7 +102,8 @@ const riskUi: Record<string, { label: string; classes: string }> = {
 
 export default function AssessmentsPage() {
   const utils = api.useUtils();
-  const { data: list, isLoading } = api.pia.list.useQuery({});
+  const { data: listData, isLoading } = api.pia.list.useQuery({});
+  const list = listData?.items ?? [];
   const { data: stats } = api.pia.stats.useQuery();
   const { data: teamMembers } = api.user.listTeamMembers.useQuery();
   const create = api.pia.create.useMutation({

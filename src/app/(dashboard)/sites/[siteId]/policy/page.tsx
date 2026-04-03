@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "@/lib/trpc";
+import { PLANS, type PlanKey } from "@/lib/stripe";
 import { DEFAULT_POLICY_PAGE_STYLE, type PolicyPageStyle } from "@/lib/policy-page-defaults";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -72,6 +73,9 @@ export default function PolicyPage() {
       initialData: DEFAULT_POLICY_PAGE_STYLE,
     },
   );
+
+  const { data: orgSummary } = api.org.summary.useQuery();
+  const canRemoveBranding = orgSummary ? (PLANS[orgSummary.plan as PlanKey] ?? PLANS.free).customBranding : false;
 
   const updatePageStyle = api.policy.updatePageStyle.useMutation({
     onSuccess: (data) => {
@@ -367,7 +371,7 @@ export default function PolicyPage() {
               {/* Nav preview */}
               <div className="border-b px-4 py-2.5" style={{ borderColor: styleDraft.accentColor + "30", backgroundColor: styleDraft.backgroundColor }}>
                 <div className="flex items-center gap-3">
-                  {styleDraft.logoUrl && <img src={styleDraft.logoUrl} alt="Logo" className="h-5 w-auto" />}
+                  {styleDraft.logoUrl && <img src={styleDraft.logoUrl} alt="Logo" className="h-5 w-auto" referrerPolicy="no-referrer" crossOrigin="anonymous" />}
                   <div className="flex gap-1">
                     <span className="rounded-full px-2.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: styleDraft.accentColor, color: "#fff" }}>Privacy Policy</span>
                     <span className="rounded-full px-2.5 py-0.5 text-[10px] font-medium" style={{ color: styleDraft.accentColor, backgroundColor: styleDraft.accentColor + "12" }}>Cookie Policy</span>
@@ -461,11 +465,19 @@ export default function PolicyPage() {
                   checked={styleDraft.showTableOfContents}
                   onChange={(v) => setStyleDraft({ ...styleDraft, showTableOfContents: v })}
                 />
-                <ToggleField
-                  label='Show "Powered by Custodia"'
-                  checked={styleDraft.showPoweredBy}
-                  onChange={(v) => setStyleDraft({ ...styleDraft, showPoweredBy: v })}
-                />
+                <div>
+                  <ToggleField
+                    label='Show "Powered by Custodia"'
+                    checked={styleDraft.showPoweredBy}
+                    onChange={(v) => {
+                      if (!v && !canRemoveBranding) return;
+                      setStyleDraft({ ...styleDraft, showPoweredBy: v });
+                    }}
+                  />
+                  {!canRemoveBranding && (
+                    <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">Growth or Business plan required to remove branding</p>
+                  )}
+                </div>
               </StyleSection>
 
               <button

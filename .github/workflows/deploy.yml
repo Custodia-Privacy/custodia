@@ -5,15 +5,56 @@ on:
     branches: [main]
 
 jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Run tests
+        run: npm run test:ci
+
   deploy:
-    # Runs directly on the founder's machine — no SSH, no dynamic IP issues
+    needs: [test]
     runs-on: self-hosted
     steps:
       - name: Pull latest code
         run: git -C ${{ github.workspace }} pull origin main
 
+      - name: Tag current image for rollback
+        run: |
+          cd ${{ github.workspace }}
+          docker tag custodia-app:latest custodia-app:rollback 2>/dev/null || true
+          docker tag custodia-scanner:latest custodia-scanner:rollback 2>/dev/null || true
+
       - name: Rebuild and restart containers
         run: docker compose -f ${{ github.workspace }}/docker-compose.yml up -d --build --wait
+
+      - name: Verify deployment health
+        run: |
+          sleep 10
+          if ! curl -sf http://localhost:3000/api/health > /dev/null; then
+            echo "Health check failed! Rolling back..."
+            cd ${{ github.workspace }}
+            docker tag custodia-app:rollback custodia-app:latest 2>/dev/null || true
+            docker tag custodia-scanner:rollback custodia-scanner:latest 2>/dev/null || true
+            docker compose -f ${{ github.workspace }}/docker-compose.yml up -d --wait
+            exit 1
+          fi
 
       - name: Show container status
         run: docker compose -f ${{ github.workspace }}/docker-compose.yml ps

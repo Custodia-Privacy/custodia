@@ -13,6 +13,7 @@ import { PrismaClient } from "@prisma/client";
 import type { ScanJobPayload } from "../../src/types";
 import { crawlSite, type CrawlResult } from "./crawler";
 import { summarizeScan, type ScanSummary } from "./ai/summarizer";
+import { analyzePrivacyPolicy, type PolicyAnalysisResult } from "./ai/policy-analyzer";
 import { calculateComplianceScores, generateRecommendations } from "./compliance";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -68,8 +69,45 @@ const worker = new Worker<ScanJobPayload>(
         console.error(`[scan:${scanId}] AI summary failed:`, err);
       }
 
+      // Analyze privacy policy content if available
+      let policyAnalysis: PolicyAnalysisResult | null = null;
+      if (results.privacyPolicyText && results.hasPrivacyPolicy) {
+        try {
+          const formsWithPII = results.pages.flatMap((p) =>
+            p.forms
+              .filter((f) => f.collectsPersonalData)
+              .map((f) => ({
+                url: p.url,
+                fields: f.fields
+                  .filter((fld) =>
+                    ["email", "tel", "password"].includes(fld.type) ||
+                    (fld.name && /name|phone|address/i.test(fld.name)),
+                  )
+                  .map((fld) => fld.name || fld.type),
+              })),
+          );
+
+          policyAnalysis = await analyzePrivacyPolicy({
+            domain,
+            policyText: results.privacyPolicyText,
+            personalDataTypes: results.personalDataTypes,
+            trackers: results.pages.flatMap((p) =>
+              p.trackers.map((t) => ({ name: t.name, category: t.category })),
+            ),
+            formsCollectingPII: formsWithPII,
+            hasCookieConsent: results.hasCookieConsent,
+          });
+
+          console.log(
+            `[scan:${scanId}] Policy analysis: ${policyAnalysis.overallAdequacy}, ${policyAnalysis.gaps.length} gap(s)`,
+          );
+        } catch (err) {
+          console.error(`[scan:${scanId}] Policy analysis failed:`, err);
+        }
+      }
+
       // Calculate compliance scores
-      const allFindings = generateFindings(results, domain);
+      const allFindings = generateFindings(results, domain, policyAnalysis);
       const complianceScores = calculateComplianceScores({
         findings: allFindings.map((f) => ({
           category: f.category,
@@ -173,7 +211,11 @@ const worker = new Worker<ScanJobPayload>(
 );
 
 /** Generate structured findings from crawl results */
-function generateFindings(results: CrawlResult, domain: string) {
+function generateFindings(
+  results: CrawlResult,
+  domain: string,
+  policyAnalysis: PolicyAnalysisResult | null = null,
+) {
   const findings: Array<{
     category: string;
     severity: string;
@@ -276,29 +318,66 @@ function generateFindings(results: CrawlResult, domain: string) {
     }
   }
 
-  // Data collection findings
+  // Data collection findings — severity adjusted if the privacy policy covers the data type
   const formsWithPII = results.pages.flatMap((p) =>
     p.forms
       .filter((f) => f.collectsPersonalData)
       .map((f) => ({ ...f, pageUrl: p.url })),
   );
 
+  const policyCoveredTopics = new Set(
+    (policyAnalysis?.coveredTopics ?? []).map((t) => t.toLowerCase()),
+  );
+  const policyIsAdequate = policyAnalysis?.overallAdequacy === "adequate";
+
   for (const form of formsWithPII) {
     const piiFieldNames = form.fields
       .filter((f) => ["email", "tel", "password"].includes(f.type) || f.name.match(/name|phone|address/i))
       .map((f) => f.name || f.type);
 
+    const coveredByPolicy = policyIsAdequate || piiFieldNames.some((name) =>
+      policyCoveredTopics.has(name.toLowerCase()) ||
+      policyCoveredTopics.has("personal data") ||
+      policyCoveredTopics.has("data collection"),
+    );
+
     findings.push({
       category: "data_collection",
-      severity: "warning",
+      severity: coveredByPolicy ? "info" : "warning",
       title: `Form collecting personal data on ${new URL(form.pageUrl).pathname}`,
-      description: `A form on this page collects personal data (${piiFieldNames.join(", ")}). Under GDPR, you must have a legal basis for processing this data and inform users in your privacy policy.`,
-      recommendation:
-        "Ensure your privacy policy documents this data collection, its purpose, and legal basis.",
-      details: { fields: piiFieldNames, method: form.method },
+      description: coveredByPolicy
+        ? `A form on this page collects personal data (${piiFieldNames.join(", ")}). This appears to be documented in your privacy policy.`
+        : `A form on this page collects personal data (${piiFieldNames.join(", ")}). Under GDPR, you must have a legal basis for processing this data and inform users in your privacy policy.`,
+      recommendation: coveredByPolicy
+        ? null
+        : "Ensure your privacy policy documents this data collection, its purpose, and legal basis.",
+      details: {
+        fields: piiFieldNames,
+        method: form.method,
+        coveredByPolicy,
+      },
       regulations: ["gdpr", "ccpa"],
       pageUrl: form.pageUrl,
     });
+  }
+
+  // Privacy policy gap findings from AI analysis
+  if (policyAnalysis && policyAnalysis.gaps.length > 0) {
+    for (const gap of policyAnalysis.gaps) {
+      findings.push({
+        category: "policy",
+        severity: gap.severity,
+        title: `Privacy policy gap: ${gap.topic}`,
+        description: gap.description,
+        recommendation: gap.recommendation,
+        details: {
+          policyAdequacy: policyAnalysis.overallAdequacy,
+          gapTopic: gap.topic,
+        },
+        regulations: ["gdpr", "ccpa"],
+        pageUrl: results.privacyPolicyUrl,
+      });
+    }
   }
 
   // Consent findings

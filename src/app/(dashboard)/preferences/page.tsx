@@ -13,7 +13,8 @@ function categoriesCount(config: unknown): number {
 
 export default function PreferencesPage() {
   const utils = api.useUtils();
-  const { data: centers, isLoading } = api.preferences.listCenters.useQuery();
+  const { data: centersData, isLoading } = api.preferences.listCenters.useQuery();
+  const centers = centersData?.items ?? [];
   const [prefWebhookUrl, setPrefWebhookUrl] = useState<Record<string, string>>({});
 
   useEffect(() => {

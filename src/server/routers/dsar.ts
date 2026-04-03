@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { createRouter, orgProcedure, publicProcedure } from "../trpc";
 import { computeDsarDueDate } from "@/lib/dsar-deadlines";
 import { getAI, getAIModel, redactForPrompt } from "@/lib/ai";
+import { checkPublicRateLimit } from "@/lib/public-rate-limit";
 
 export const dsarRouter = createRouter({
   /** List all DSARs for the org, with optional status filter */
@@ -22,19 +23,31 @@ export const dsarRouter = createRouter({
             "appealed",
           ])
           .optional(),
+        cursor: z.string().uuid().optional(),
+        limit: z.number().min(1).max(100).default(20),
       }).default({}),
     )
     .query(async ({ ctx, input }) => {
-      return ctx.db.dsarRequest.findMany({
+      const items = await ctx.db.dsarRequest.findMany({
         where: {
           orgId: ctx.orgId,
           ...(input.status ? { status: input.status } : {}),
         },
         orderBy: { dueDate: "asc" },
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
         include: {
           _count: { select: { activities: true } },
         },
       });
+
+      let nextCursor: string | null = null;
+      if (items.length > input.limit) {
+        const lastItem = items.pop()!;
+        nextCursor = lastItem.id;
+      }
+
+      return { items, nextCursor };
     }),
 
   /** Get a single DSAR by ID with activity log */
@@ -443,6 +456,21 @@ Respond in JSON format:
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const ip =
+        ctx.headers.get("cf-connecting-ip") ||
+        ctx.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        "unknown";
+
+      const ipLimit = checkPublicRateLimit(`dsar-portal:ip:${ip}`, 5, 60 * 60 * 1000);
+      if (!ipLimit.ok) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many requests. Please try again later." });
+      }
+
+      const orgLimit = checkPublicRateLimit(`dsar-portal:org:${input.orgSlug}`, 20, 60 * 60 * 1000);
+      if (!orgLimit.ok) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many requests. Please try again later." });
+      }
+
       const org = await ctx.db.organization.findUnique({
         where: { slug: input.orgSlug },
       });

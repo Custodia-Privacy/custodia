@@ -227,7 +227,7 @@ function renderBanner(){
   };
 }
 
-${customCss ? `// Custom CSS\nvar style=document.createElement('style');style.textContent=${JSON.stringify(customCss)};document.head.appendChild(style);` : ''}
+${customCss ? `// Custom CSS\nvar style=document.createElement('style');style.textContent=${JSON.stringify(sanitizeCss(customCss))};document.head.appendChild(style);` : ''}
 
 function init(){
   enableCategory('necessary');
@@ -240,7 +240,21 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
 }
 
 function escapeJs(str: string): string {
-  return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/</g, "\\x3c")
+    .replace(/>/g, "\\x3e");
+}
+
+function sanitizeCss(css: string): string {
+  return css
+    .replace(/@import\b[^;]*/gi, "/* @import removed */")
+    .replace(/expression\s*\(/gi, "/* expression removed */(")
+    .replace(/-moz-binding\s*:/gi, "/* -moz-binding removed */:")
+    .replace(/url\s*\(\s*(['"]?)(?!data:image\/)(.*?)\1\s*\)/gi, "/* url removed */");
 }
 
 function escapeHtml(str: string): string {

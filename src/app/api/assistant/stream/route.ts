@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     }),
     db.dsarRequest.findMany({
       where: { orgId, status: { notIn: ["fulfilled", "rejected"] } },
-      select: { id: true, requesterName: true, requesterEmail: true, requestType: true, status: true, dueDate: true },
+      select: { id: true, requestType: true, status: true, dueDate: true, jurisdiction: true },
       orderBy: { dueDate: "asc" },
       take: 20,
     }),
@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
     : "(no unread alerts)";
 
   const dsarLines = dsars.length > 0
-    ? dsars.map((d) => `id=${d.id} name=${d.requesterName} email=${d.requesterEmail} type=${d.requestType} status=${d.status} due=${d.dueDate.toISOString().slice(0, 10)}`).join("\n")
+    ? dsars.map((d) => `id=${d.id} name=[redacted] email=[redacted] type=${d.requestType} status=${d.status} due=${d.dueDate.toISOString().slice(0, 10)} jurisdiction=${d.jurisdiction}`).join("\n")
     : "(no open requests)";
 
   const systemPrompt = [
@@ -348,7 +348,7 @@ export async function POST(req: NextRequest) {
             proposals.push({ id, tool: tc.name, input: inputObj, label: `Create ${inputObj.requestType} request for ${inputObj.requesterName}` });
           } else if (tc.name === "propose_update_dsar_status") {
             const dsar = dsars.find((d) => d.id === inputObj.id);
-            proposals.push({ id, tool: tc.name, input: inputObj, label: dsar ? `Move ${dsar.requesterName}'s request → ${inputObj.status}` : `Update request → ${inputObj.status}` });
+            proposals.push({ id, tool: tc.name, input: inputObj, label: dsar ? `Move ${dsar.requestType} request → ${inputObj.status}` : `Update request → ${inputObj.status}` });
           } else if (tc.name === "propose_generate_policy") {
             const siteId = String(inputObj.siteId ?? "").trim();
             const policyType = String(inputObj.type ?? "privacy_policy");

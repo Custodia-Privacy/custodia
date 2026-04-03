@@ -140,10 +140,10 @@ Respond with JSON only: {"summary":"string","dataCategories":["string"],"identif
 
 Request Type: ${dsar.requestType}
 Jurisdiction: ${dsar.jurisdiction}
-Requester: ${dsar.requesterName}
-Email: ${dsar.requesterEmail}
-Phone: ${dsar.requesterPhone ?? "Not provided"}
-Additional Notes: ${dsar.notes ?? "None"}
+Requester: [Requester]
+Email: [requester-email-redacted]
+Phone: ${dsar.requesterPhone ? "[phone-redacted]" : "Not provided"}
+Additional Notes: ${dsar.notes ? "[user-provided notes redacted for privacy]" : "None"}
 
 Based on the request type and jurisdiction:
 1. Summarize what the requester is asking for
@@ -157,9 +157,9 @@ Based on the request type and jurisdiction:
       return this.parseJSON(text);
     } catch {
       return {
-        summary: `${dsar.requestType} request from ${dsar.requesterName} under ${dsar.jurisdiction}`,
+        summary: `${dsar.requestType} request under ${dsar.jurisdiction}`,
         dataCategories: ["contact_info", "account_data", "usage_data", "communications"],
-        identifiers: [dsar.requesterEmail, dsar.requesterName, ...(dsar.requesterPhone ? [dsar.requesterPhone] : [])],
+        identifiers: ["[requester-email]", "[requester-name]", ...(dsar.requesterPhone ? ["[requester-phone]"] : [])],
         specialConsiderations: [`Review ${dsar.jurisdiction} requirements for response timeline`],
       };
     }
@@ -199,9 +199,9 @@ Respond with JSON only: an array of objects with shape:
 Only include stores that are likely to contain relevant data. Be specific about search strategies.`,
       prompt: `DSAR Context:
 - Request type: ${dsar.requestType}
-- Subject: ${dsar.requesterName} (${dsar.requesterEmail})
+- Subject: [Requester] ([requester-email-redacted])
 - Data categories to find: ${analysis.dataCategories.join(", ")}
-- Available identifiers: ${analysis.identifiers.join(", ")}
+- Available identifiers: email, name, phone (if provided)
 
 Connected Data Stores:
 ${JSON.stringify(storeDescriptions, null, 2)}
@@ -218,7 +218,7 @@ For each relevant store, explain what data is likely there and how to search for
         storeName: ds.name,
         storeType: ds.type,
         likelyDataTypes: ["unknown"],
-        searchStrategy: `Search by email: ${dsar.requesterEmail}`,
+        searchStrategy: "Search by email identifier",
         confidence: "low" as const,
       }));
     }
@@ -251,7 +251,7 @@ Respond with JSON only:
 
 Request Details:
 - Type: ${dsar.requestType}
-- Requester: ${dsar.requesterName} (${dsar.requesterEmail})
+- Requester: [Requester] ([requester-email-redacted])
 - Jurisdiction: ${dsar.jurisdiction} (${jurisdictionInfo.regulation})
 - Received: ${dsar.receivedAt.toISOString().split("T")[0]}
 - Due Date: ${dsar.dueDate.toISOString().split("T")[0]}

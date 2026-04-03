@@ -433,7 +433,7 @@ export default function BannerPage() {
                   <div className="mb-2 h-3 w-full rounded bg-slate-200" />
                   <div className="mb-2 h-3 w-3/4 rounded bg-slate-200" />
                 </div>
-                <iframe title="Banner preview" className="absolute inset-0 h-full w-full border-0" sandbox="allow-scripts" srcDoc={previewDoc} />
+                <iframe title="Banner preview" className="absolute inset-0 h-full w-full border-0" sandbox="allow-scripts allow-same-origin" srcDoc={previewDoc} />
               </div>
             </div>
 
@@ -508,7 +508,8 @@ function buildLivePreview(d: BannerDraft): string {
   else positionCss += "border-top:1px solid " + border + ";";
 
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const logoHtml = d.logoUrl ? `<img class="logo" src="${esc(d.logoUrl)}" alt="" onerror="this.style.display='none'" />` : "";
+  const proxiedLogo = d.logoUrl ? `/api/image-proxy?url=${encodeURIComponent(d.logoUrl)}` : "";
+  const logoHtml = d.logoUrl ? `<img class="logo" src="${esc(proxiedLogo)}" alt="" onerror="this.style.display='none'" />` : "";
 
   const catHtml = d.categories.filter(c => !c.required).map(c =>
     `<label class="cat"><input type="checkbox" checked /><span class="cat-name">${esc(c.name)}</span><span class="cat-desc">${esc(c.description)}</span>${c.cookies.length ? `<span class="cat-count">${c.cookies.length} cookie${c.cookies.length > 1 ? "s" : ""}</span>` : ""}</label>`

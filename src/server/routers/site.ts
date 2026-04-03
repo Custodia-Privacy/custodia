@@ -10,19 +10,41 @@ import {
 
 export const siteRouter = createRouter({
   /** List all sites in the user's organization */
-  list: orgProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db.site.findMany({
-      where: { orgId: ctx.orgId, deletedAt: null },
-      include: {
-        _count: { select: { scans: true, findings: { where: { resolvedAt: null } } } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return rows.map(({ privacyWebhookSecret: _s, ...site }) => ({
-      ...site,
-      privacyWebhookSecretConfigured: Boolean(_s),
-    }));
-  }),
+  list: orgProcedure
+    .input(
+      z
+        .object({
+          cursor: z.string().uuid().optional(),
+          limit: z.number().min(1).max(50).default(20),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 20;
+
+      const rows = await ctx.db.site.findMany({
+        where: { orgId: ctx.orgId, deletedAt: null },
+        include: {
+          _count: { select: { scans: true, findings: { where: { resolvedAt: null } } } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        ...(input?.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      });
+
+      let nextCursor: string | null = null;
+      if (rows.length > limit) {
+        const lastItem = rows.pop()!;
+        nextCursor = lastItem.id;
+      }
+
+      const items = rows.map(({ privacyWebhookSecret: _s, ...site }) => ({
+        ...site,
+        privacyWebhookSecretConfigured: Boolean(_s),
+      }));
+
+      return { items, nextCursor };
+    }),
 
   /** Get a single site with its latest scan, banner, and policy */
   get: orgProcedure

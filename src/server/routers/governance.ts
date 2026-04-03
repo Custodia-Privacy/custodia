@@ -23,17 +23,31 @@ export const governanceRouter = createRouter({
               "other",
             ])
             .optional(),
+          cursor: z.string().uuid().optional(),
+          limit: z.number().min(1).max(200).default(50),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
-      return ctx.db.dataStore.findMany({
+      const limit = input?.limit ?? 50;
+
+      const items = await ctx.db.dataStore.findMany({
         where: {
           orgId: ctx.orgId,
           ...(input?.type ? { type: input.type } : {}),
         },
         orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        ...(input?.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
       });
+
+      let nextCursor: string | null = null;
+      if (items.length > limit) {
+        const lastItem = items.pop()!;
+        nextCursor = lastItem.id;
+      }
+
+      return { items, nextCursor };
     }),
 
   /** Get a single data store by ID */
@@ -202,16 +216,37 @@ Respond with ONLY valid JSON:
     }),
 
   /** List all data flows for the organization */
-  listFlows: orgProcedure.query(async ({ ctx }) => {
-    return ctx.db.dataFlow.findMany({
-      where: { orgId: ctx.orgId },
-      include: {
-        source: { select: { id: true, name: true, type: true, location: true } },
-        target: { select: { id: true, name: true, type: true, location: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }),
+  listFlows: orgProcedure
+    .input(
+      z
+        .object({
+          cursor: z.string().uuid().optional(),
+          limit: z.number().min(1).max(200).default(50),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+
+      const items = await ctx.db.dataFlow.findMany({
+        where: { orgId: ctx.orgId },
+        include: {
+          source: { select: { id: true, name: true, type: true, location: true } },
+          target: { select: { id: true, name: true, type: true, location: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        ...(input?.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      });
+
+      let nextCursor: string | null = null;
+      if (items.length > limit) {
+        const lastItem = items.pop()!;
+        nextCursor = lastItem.id;
+      }
+
+      return { items, nextCursor };
+    }),
 
   /** Create a data flow between two stores */
   createFlow: orgProcedure
@@ -365,12 +400,33 @@ Respond with ONLY valid JSON:
   }),
 
   /** List all vendors for the organization */
-  listVendors: orgProcedure.query(async ({ ctx }) => {
-    return ctx.db.vendor.findMany({
-      where: { orgId: ctx.orgId },
-      orderBy: { createdAt: "desc" },
-    });
-  }),
+  listVendors: orgProcedure
+    .input(
+      z
+        .object({
+          cursor: z.string().uuid().optional(),
+          limit: z.number().min(1).max(200).default(50),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+
+      const items = await ctx.db.vendor.findMany({
+        where: { orgId: ctx.orgId },
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        ...(input?.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      });
+
+      let nextCursor: string | null = null;
+      if (items.length > limit) {
+        const lastItem = items.pop()!;
+        nextCursor = lastItem.id;
+      }
+
+      return { items, nextCursor };
+    }),
 
   /** Create a vendor */
   createVendor: orgProcedure

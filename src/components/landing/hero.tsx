@@ -145,6 +145,7 @@ export function Hero() {
               <input
                 type="text"
                 placeholder="Enter your website URL"
+                aria-label="Website URL"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="flex-1 px-4 py-3 text-sm outline-none placeholder:text-slate-400 dark:bg-slate-900 dark:text-white"

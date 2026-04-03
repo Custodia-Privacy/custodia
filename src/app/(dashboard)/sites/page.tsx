@@ -20,7 +20,8 @@ function scoreBg(score: number | null) {
 
 export default function SitesPage() {
   const utils = api.useUtils();
-  const { data: sites, isLoading } = api.site.list.useQuery();
+  const { data: sitesData, isLoading } = api.site.list.useQuery();
+  const sites = sitesData?.items ?? [];
   const createSite = api.site.create.useMutation({
     onSuccess: () => {
       void utils.site.list.invalidate();
@@ -65,8 +66,9 @@ export default function SitesPage() {
         >
           <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Domain</label>
+              <label htmlFor="site-domain" className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Domain</label>
               <input
+                id="site-domain"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
                 placeholder="example.com"
@@ -75,8 +77,9 @@ export default function SitesPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Display name</label>
+              <label htmlFor="site-name" className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Display name</label>
               <input
+                id="site-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Storefront"

@@ -15,8 +15,10 @@ const SENS_CLASSES: Record<string, string> = {
 
 export default function DataMapPage() {
   const utils = api.useUtils();
-  const { data: stores, isLoading } = api.governance.listStores.useQuery({});
-  const { data: flows } = api.governance.listFlows.useQuery();
+  const { data: storesData, isLoading } = api.governance.listStores.useQuery({});
+  const stores = storesData?.items ?? [];
+  const { data: flowsData } = api.governance.listFlows.useQuery();
+  const flows = flowsData?.items ?? [];
   const exportInventory = api.governance.exportDataInventory.useQuery(undefined, {
     enabled: false,
   });
@@ -32,7 +34,7 @@ export default function DataMapPage() {
   const [storeType, setStoreType] = useState("database");
   const [provider, setProvider] = useState("");
 
-  const preview = (stores ?? []).slice(0, 8);
+  const preview = stores.slice(0, 8);
 
   return (
     <div className="p-6 lg:p-8">
@@ -171,11 +173,11 @@ export default function DataMapPage() {
             ))}
           </div>
         )}
-        {(flows ?? []).length > 0 && (
+        {flows.length > 0 && (
           <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
             <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Flows</p>
             <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
-              {(flows ?? []).slice(0, 10).map((f) => (
+              {flows.slice(0, 10).map((f) => (
                 <li key={f.id}>
                   {f.source.name} → {f.target.name}
                 </li>
@@ -210,7 +212,7 @@ export default function DataMapPage() {
                     Loading…
                   </td>
                 </tr>
-              ) : !stores?.length ? (
+              ) : stores.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                     No data stores registered yet. Add one above to start mapping your data.
