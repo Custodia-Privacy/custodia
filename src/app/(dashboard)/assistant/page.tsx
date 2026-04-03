@@ -177,7 +177,7 @@ export default function AssistantPage() {
                   {row.action.replace(/^assistant_/, "")}
                 </span>
                 <span className="text-slate-400">
-                  {new Date(row.createdAt).toLocaleString()} · {row.user.email}
+                  {new Date(row.createdAt).toLocaleString()} · {row.user?.email ?? "system"}
                 </span>
               </li>
             ))}
