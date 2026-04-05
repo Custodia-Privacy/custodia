@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/trpc";
-import { PLANS } from "@/lib/stripe";
+import { PLANS, type PlanKey } from "@/lib/stripe";
 
 function formatMoney(cents: number) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
@@ -38,6 +38,13 @@ export default function SettingsPage() {
   });
 
   const portal = api.billing.createPortal.useMutation({
+    onSuccess: (data) => {
+      if (data.url) window.location.href = data.url;
+    },
+    onError: (e) => setBillingError(e.message),
+  });
+
+  const checkout = api.billing.createCheckout.useMutation({
     onSuccess: (data) => {
       if (data.url) window.location.href = data.url;
     },
@@ -160,6 +167,7 @@ export default function SettingsPage() {
           {subLoading ? (
             <p className="text-sm text-slate-500">Loading billing…</p>
           ) : (
+            <>
             <div className="rounded-lg border border-slate-100 px-4 py-3 dark:border-slate-800">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -180,15 +188,53 @@ export default function SettingsPage() {
               {!isOwner && (
                 <p className="mt-2 text-xs text-slate-500">Only the organization owner can open the billing portal.</p>
               )}
-              {planKey === "free" && isOwner && (
-                <Link
-                  href="/pricing"
-                  className="mt-3 inline-block text-sm font-medium text-navy-700 hover:underline dark:text-navy-400"
-                >
-                  View plans / upgrade
-                </Link>
-              )}
             </div>
+            {isOwner && planKey !== "business" && (
+              <div className="mt-4">
+                <p className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">Upgrade your plan</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {(
+                    [
+                      { key: "starter" as const, name: "Starter", price: "$29", features: "1 site, weekly scans, banner + policy" },
+                      { key: "growth" as const, name: "Growth", price: "$79", features: "5 sites, daily scans, DSAR portal, PIAs" },
+                      { key: "business" as const, name: "Business", price: "$149", features: "25 sites, governance, API, custom branding" },
+                    ] as const
+                  )
+                    .filter((t) => {
+                      const order: PlanKey[] = ["free", "starter", "growth", "business"];
+                      return order.indexOf(t.key) > order.indexOf(planKey);
+                    })
+                    .map((tier) => (
+                      <div
+                        key={tier.key}
+                        className={`rounded-lg border p-4 ${
+                          tier.key === "growth"
+                            ? "border-navy-300 bg-navy-50/50 dark:border-navy-700 dark:bg-navy-950/30"
+                            : "border-slate-200 dark:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-baseline justify-between">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{tier.name}</p>
+                          <p className="text-sm font-bold text-navy-700 dark:text-navy-300">{tier.price}<span className="text-xs font-normal text-slate-400">/mo</span></p>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{tier.features}</p>
+                        <button
+                          type="button"
+                          disabled={checkout.isPending}
+                          onClick={() => {
+                            setBillingError(null);
+                            checkout.mutate({ plan: tier.key });
+                          }}
+                          className="mt-3 w-full rounded-lg bg-navy-950 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-navy-900 disabled:opacity-50 dark:bg-navy-600 dark:hover:bg-navy-500"
+                        >
+                          {checkout.isPending ? "Redirecting…" : `Upgrade to ${tier.name}`}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
 
