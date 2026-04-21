@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSafeUrl } from "@/lib/ip-check";
 
-const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp", "image/x-icon"]);
+// SVG is intentionally excluded: it can contain inline <script> that executes
+// same-origin when loaded as a top-level document, enabling session theft.
+const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/x-icon"]);
 const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
 
 export async function GET(req: NextRequest) {
@@ -39,6 +41,9 @@ export async function GET(req: NextRequest) {
     return new NextResponse(body, {
       headers: {
         "Content-Type": baseType,
+        "Content-Disposition": 'inline; filename="image"',
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
         "Cache-Control": "public, max-age=3600, s-maxage=86400",
         "Access-Control-Allow-Origin": "*",
       },

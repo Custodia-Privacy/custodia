@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import sanitizeHtmlLib from "sanitize-html";
 import { db } from "@/lib/db";
 import type { PolicyType } from "@prisma/client";
 
@@ -88,24 +89,38 @@ export async function GET(
   );
 }
 
-const ALLOWED_TAGS = new Set(["h1","h2","h3","h4","h5","h6","p","br","strong","b","em","i","u","a","ul","ol","li","table","thead","tbody","tr","th","td","div","span","blockquote","hr","pre","code","img","section","article","header","footer","main","nav","dl","dt","dd","sup","sub"]);
-const TAG_RE = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
-const EVENT_RE = /\s+on\w+\s*=\s*["'][^"']*["']/gi;
-const SCRIPT_RE = /<script\b[^>]*>[\s\S]*?<\/script>/gi;
-const STYLE_TAG_RE = /<style\b[^>]*>[\s\S]*?<\/style>/gi;
+// Whitelist of allowed HTML tags/attributes for policy content. This is applied
+// to BOTH the HTML branch AND the markdown-rendered branch — previously the
+// markdown branch ran no sanitization at all, which allowed stored XSS when an
+// authenticated user set contentMarkdown to `<script>...</script>\n\ntext`.
+const SANITIZE_OPTIONS: sanitizeHtmlLib.IOptions = {
+  allowedTags: [
+    "h1","h2","h3","h4","h5","h6","p","br","strong","b","em","i","u","a",
+    "ul","ol","li","table","thead","tbody","tr","th","td","div","span",
+    "blockquote","hr","pre","code","img","section","article","header",
+    "footer","main","nav","dl","dt","dd","sup","sub",
+  ],
+  allowedAttributes: {
+    a: ["href", "rel", "target", "title"],
+    img: ["src", "alt", "title", "width", "height"],
+    "*": ["id", "class"],
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+  allowedSchemesByTag: { img: ["http", "https"] },
+  allowProtocolRelative: false,
+  disallowedTagsMode: "discard",
+  transformTags: {
+    a: sanitizeHtmlLib.simpleTransform("a", { rel: "noopener nofollow", target: "_blank" }, true),
+  },
+};
 
-function sanitizeHtml(html: string): string {
-  let clean = html.replace(SCRIPT_RE, "").replace(STYLE_TAG_RE, "");
-  clean = clean.replace(EVENT_RE, "");
-  clean = clean.replace(TAG_RE, (match, tag) => {
-    return ALLOWED_TAGS.has(tag.toLowerCase()) ? match.replace(EVENT_RE, "") : "";
-  });
-  return clean;
+function sanitize(html: string): string {
+  return sanitizeHtmlLib(html, SANITIZE_OPTIONS);
 }
 
 function renderStandalonePage(title: string, body: string): string {
   const isMarkdown = !body.includes("<h1") && !body.includes("<h2");
-  const renderedBody = isMarkdown
+  const intermediateHtml = isMarkdown
     ? body
         .replace(/^### (.+)$/gm, "<h3>$1</h3>")
         .replace(/^## (.+)$/gm, "<h2>$1</h2>")
@@ -114,7 +129,8 @@ function renderStandalonePage(title: string, body: string): string {
         .replace(/\*(.+?)\*/g, "<em>$1</em>")
         .replace(/^- (.+)$/gm, "<li>$1</li>")
         .replace(/\n\n/g, "<br><br>")
-    : sanitizeHtml(body);
+    : body;
+  const renderedBody = sanitize(intermediateHtml);
 
   return `<!DOCTYPE html>
 <html lang="en">
