@@ -378,25 +378,6 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Social proof bar */}
-        <div className="mx-auto mt-20 max-w-3xl">
-          <p className="text-center text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500">
-            Trusted by 500+ small businesses
-          </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
-            {[
-              { label: "Sites scanned", value: "2,400+" },
-              { label: "Trackers found", value: "18,000+" },
-              { label: "Policies generated", value: "1,200+" },
-              { label: "Data requests handled", value: "3,100+" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-2xl font-bold text-navy-950 dark:text-white">{stat.value}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   );

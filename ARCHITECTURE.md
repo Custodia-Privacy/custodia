@@ -512,7 +512,7 @@ Lightweight JS bundle (~15KB gzipped) served from `/api/banner/[siteId]`:
 
 ## 13. Pricing & Plan Limits
 
-| Feature | Free | Starter ($29/mo) | Growth ($49/mo) | Business ($99/mo) |
+| Feature | Free | Starter ($29/mo) | Growth ($79/mo) | Business ($149/mo) |
 |---------|------|-------------------|-----------------|-------------------|
 | Sites | 1 | 3 | 10 | Unlimited |
 | Scans/month | 1 (quick) | 10 full | 50 full | Unlimited |
