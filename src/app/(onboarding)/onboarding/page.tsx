@@ -467,7 +467,7 @@ export default function OnboardingPage() {
                   href="/pricing"
                   className="mt-4 flex w-full items-center justify-center rounded-lg bg-navy-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-700"
                 >
-                  Start Free Trial — $29/mo
+                  Upgrade to Starter — $29/mo
                 </a>
               </div>
 

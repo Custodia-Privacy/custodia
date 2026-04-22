@@ -135,7 +135,7 @@ export const scanRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const clientIp = getClientIp(ctx.headers as unknown as Request);
+      const clientIp = getClientIp(ctx.headers);
       const rl = checkPublicRateLimit(`quick-scan:${clientIp}`, 5, 60 * 60 * 1000);
       if (!rl.ok) {
         throw new TRPCError({

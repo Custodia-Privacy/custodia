@@ -186,15 +186,20 @@ export async function fetchSafely(
  * Get the real client IP, preferring Cloudflare's header
  * (not spoofable when behind CF), falling back to X-Real-IP,
  * then X-Forwarded-For with caution.
+ *
+ * Accepts either a full `Request` (Next.js route handlers) or a bare
+ * `Headers` instance (tRPC context, where `ctx.headers` is a Headers).
  */
-export function getClientIp(req: Request): string {
-  const cfIp = req.headers.get("cf-connecting-ip");
+export function getClientIp(source: Request | Headers): string {
+  const headers = source instanceof Headers ? source : source.headers;
+
+  const cfIp = headers.get("cf-connecting-ip");
   if (cfIp) return cfIp.trim();
 
-  const realIp = req.headers.get("x-real-ip");
+  const realIp = headers.get("x-real-ip");
   if (realIp) return realIp.trim();
 
-  const xff = req.headers.get("x-forwarded-for");
+  const xff = headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0]?.trim() || "unknown";
 
   return "unknown";

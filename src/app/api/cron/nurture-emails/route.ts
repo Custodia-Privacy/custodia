@@ -54,7 +54,7 @@ const DAY7_HTML = `<div style="font-family: -apple-system, BlinkMacSystemFont, '
   <p style="font-size: 15px; margin-top: 24px;">Custodia automates steps 1–4. Plans start at $29/month. Most businesses are fully set up in under an hour.</p>
 
   <div style="margin-top: 32px; text-align: center;">
-    <a href="https://app.custodia-privacy.com/signup" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 14px; font-weight: 600;">Start your free trial →</a>
+    <a href="https://app.custodia-privacy.com/signup" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 14px; font-weight: 600;">Get started free →</a>
   </div>
 
   <p style="font-size: 13px; color: #94a3b8; margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 16px;">Custodia — Privacy compliance for small businesses<br>hello@custodia-privacy.com</p>

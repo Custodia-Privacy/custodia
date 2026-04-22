@@ -207,7 +207,7 @@ export function Sidebar({ userName = "User", planName = "Free", onNavigate }: Si
             href="/pricing"
             className="mt-2.5 block rounded-md bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-navy-950 hover:bg-navy-50"
           >
-            Start Free Trial →
+            See plans →
           </a>
         </div>
       )}

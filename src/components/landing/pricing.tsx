@@ -15,8 +15,8 @@ const tiers = [
       "AI co-pilot assistant",
       "Email support",
     ],
-    cta: "Start Free Trial",
-    href: "/signup?plan=starter",
+    cta: "Get Started Free",
+    href: "/signup",
     highlighted: false,
   },
   {
@@ -34,8 +34,8 @@ const tiers = [
       "Privacy impact assessments",
       "Priority support",
     ],
-    cta: "Start Free Trial",
-    href: "/signup?plan=growth",
+    cta: "Get Started Free",
+    href: "/signup",
     highlighted: true,
   },
   {
@@ -52,8 +52,8 @@ const tiers = [
       "Team collaboration (50 seats)",
       "Dedicated onboarding",
     ],
-    cta: "Start Free Trial",
-    href: "/signup?plan=business",
+    cta: "Get Started Free",
+    href: "/signup",
     highlighted: false,
   },
 ];
@@ -70,8 +70,8 @@ export function Pricing() {
             Compliance shouldn&apos;t cost a fortune
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-600 dark:text-slate-400">
-            Enterprise-grade privacy compliance at small business prices. All
-            plans include a 14-day free trial — no credit card required.
+            Enterprise-grade privacy compliance at small business prices.
+            Start on the free tier, upgrade any time — cancel with one click.
           </p>
         </div>
 

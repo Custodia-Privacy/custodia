@@ -7,7 +7,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Pricing — Custodia",
   description:
-    "Privacy compliance for businesses that can't afford a legal team. Free scan, plans from $29/mo.",
+    "Privacy compliance for businesses that can't afford a legal team. Free scan and free tier, paid plans from $29/mo.",
 };
 
 const featureRows: { label: string; starter: string | boolean; growth: string | boolean; business: string | boolean }[] = [
@@ -107,7 +107,7 @@ export default function PricingPage() {
               href="/signup"
               className="inline-block rounded-xl bg-navy-950 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy-900 dark:bg-navy-600 dark:hover:bg-navy-500"
             >
-              Start Your Free Trial
+              Get Started Free
             </Link>
           </div>
         </div>
