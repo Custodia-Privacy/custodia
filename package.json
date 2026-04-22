@@ -6,6 +6,7 @@
     "postinstall": "prisma generate",
     "dev": "next dev --webpack",
     "build": "next build",
+    "postbuild": "cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit -p tsconfig.ci.json",
