@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSafeUrl } from "@/lib/ip-check";
+import { isSafeUrl, fetchSafely } from "@/lib/ip-check";
 
 // SVG is intentionally excluded: it can contain inline <script> that executes
 // same-origin when loaded as a top-level document, enabling session theft.
@@ -17,10 +17,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(url, {
+    const upstream = await fetchSafely(url, {
       headers: { Accept: "image/*" },
-      redirect: "error",
       signal: AbortSignal.timeout(5000),
+      maxRedirects: 0,
     });
 
     if (!upstream.ok) {

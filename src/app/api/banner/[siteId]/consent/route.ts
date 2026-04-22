@@ -25,15 +25,18 @@ function detectJurisdiction(country: string | null): string | null {
   return null;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(
   req: Request,
   props: { params: Promise<{ siteId: string }> },
 ) {
   const rawSiteId = (await props.params).siteId.replace(/\.js$/, "");
-  const siteId = rawSiteId.replace(/[^a-zA-Z0-9_-]/g, "");
-  if (siteId.length < 10 || siteId.length > 64) {
+  if (!UUID_RE.test(rawSiteId)) {
     return NextResponse.json({ error: "Invalid siteId" }, { status: 400 });
   }
+  const siteId = rawSiteId.toLowerCase();
 
   const { getClientIp } = await import("@/lib/ip-check");
   const clientIp = getClientIp(req);
@@ -43,6 +46,24 @@ export async function POST(
       { error: "rate_limited" },
       { status: 429, headers: { ...rateLimitHeaders(rl), "Access-Control-Allow-Origin": "*" } },
     );
+  }
+
+  // Resolve the site up front. Rejecting unknown siteIds before the
+  // write avoids FK-violation exceptions (which surface as 500s) and
+  // keeps a bad actor from generating log noise with random UUIDs.
+  const site = await db.site.findUnique({
+    where: { id: siteId },
+    select: {
+      id: true,
+      orgId: true,
+      domain: true,
+      deletedAt: true,
+      privacyWebhookUrl: true,
+      privacyWebhookSecret: true,
+    },
+  });
+  if (!site || site.deletedAt) {
+    return NextResponse.json({ error: "Site not found" }, { status: 404 });
   }
 
   try {
@@ -67,7 +88,7 @@ export async function POST(
 
     const jurisdiction = detectJurisdiction(country);
 
-    const log = await db.consentLog.create({
+    const logRow = await db.consentLog.create({
       data: {
         siteId,
         visitorId,
@@ -79,16 +100,7 @@ export async function POST(
       },
     });
 
-    const site = await db.site.findUnique({
-      where: { id: siteId },
-      select: {
-        orgId: true,
-        domain: true,
-        privacyWebhookUrl: true,
-        privacyWebhookSecret: true,
-      },
-    });
-    if (site?.privacyWebhookUrl && site.privacyWebhookSecret) {
+    if (site.privacyWebhookUrl && site.privacyWebhookSecret) {
       void deliverPrivacyWebhook({
         url: site.privacyWebhookUrl,
         secret: site.privacyWebhookSecret,
@@ -99,7 +111,7 @@ export async function POST(
           orgId: site.orgId,
           siteId,
           siteDomain: site.domain,
-          consentLogId: log.id,
+          consentLogId: logRow.id,
           consent,
           action,
           jurisdiction,

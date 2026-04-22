@@ -1,8 +1,12 @@
 /**
  * Lightweight inline scanner for quick/lead-gen scans.
  * Uses HTTP fetch + HTML parsing — no Playwright or BullMQ required.
+ *
+ * SSRF: outbound fetch MUST go through `fetchSafely`, which validates
+ * DNS resolution and re-checks every redirect hop.
  */
 import { PrismaClient, type FindingCategory, type Severity } from "@prisma/client";
+import { fetchSafely, SsrfError } from "./ip-check";
 
 interface TrackerPattern {
   name: string;
@@ -205,26 +209,30 @@ export async function runQuickScan(
     const timeout = setTimeout(() => controller.abort(), 15_000);
 
     const url = `https://${domain}`;
-    const res = await fetch(url, {
+    const res = await fetchSafely(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept: "text/html,application/xhtml+xml",
       },
-      redirect: "follow",
       signal: controller.signal,
+      maxRedirects: 5,
     });
     clearTimeout(timeout);
 
     html = await res.text();
     setCookieHeaders = res.headers.getSetCookie?.() ?? [];
-  } catch (err: any) {
+  } catch (err) {
+    const isSsrf = err instanceof SsrfError;
+    const message = err instanceof Error ? err.message : "Connection failed";
     await db.scan.update({
       where: { id: scanId },
       data: {
         status: "failed",
         completedAt: new Date(),
-        errorMessage: `Could not reach ${domain}: ${err.message ?? "Connection failed"}`,
+        errorMessage: isSsrf
+          ? `Target domain ${domain} resolves to a blocked address.`
+          : `Could not reach ${domain}: ${message}`,
       },
     });
     return { findingsCreated: 0, hasPrivacyPolicy: false, hasConsentBanner: false, trackersFound: [] };
