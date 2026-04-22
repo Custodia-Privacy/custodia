@@ -512,18 +512,24 @@ Lightweight JS bundle (~15KB gzipped) served from `/api/banner/[siteId]`:
 
 ## 13. Pricing & Plan Limits
 
+Source of truth: `src/lib/stripe.ts` `PLANS` constant. Live Stripe price IDs
+in `.env` must match these amounts. Verified against live Stripe API.
+
 | Feature | Free | Starter ($29/mo) | Growth ($79/mo) | Business ($149/mo) |
 |---------|------|-------------------|-----------------|-------------------|
-| Sites | 1 | 3 | 10 | Unlimited |
-| Scans/month | 1 (quick) | 10 full | 50 full | Unlimited |
+| Sites | 1 | 1 | 5 | 25 |
+| Scans/month | 1 (quick) | 10 full | 50 full | 200 full |
 | Cookie banner | No | Yes | Yes | Yes |
 | Privacy policy | Preview | Yes | Yes | Yes |
-| Monitoring | No | Weekly | Daily | Real-time |
+| Monitoring | No | Weekly | Daily | Daily |
 | DSAR management | No | Basic | Full + AI | Full + AI |
 | PIAs | No | No | Yes | Yes |
-| Data governance | No | No | Basic | Full |
-| Team members | 1 | 3 | 10 | Unlimited |
-| MCP/API access | No | No | Yes | Yes |
+| Data governance | No | No | No | Yes |
+| Team members | 1 | 3 | 10 | 50 |
+| Consent-log retention | None | 90 days | 1 year | 2 years |
+| AI completions / mo | 5 | 50 | 200 | 1000 |
+| Custom branding | No | No | Yes | Yes |
+| MCP/API access | No | No | No | Yes |
 
 ---
 
