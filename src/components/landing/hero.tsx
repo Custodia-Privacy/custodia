@@ -77,10 +77,6 @@ function FindingRow({
 export function Hero() {
   const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
-  const [email, setEmail] = useState("");
-  const [emailUnlocked, setEmailUnlocked] = useState(false);
-  const [emailSubmitting, setEmailSubmitting] = useState(false);
-  const [emailError, setEmailError] = useState("");
   const scan = api.scan.quick.useMutation();
   const scanId = scan.data?.scanId;
 
@@ -110,32 +106,6 @@ export function Hero() {
     if (!raw) return;
     const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
     scan.mutate({ url: normalized });
-  }
-
-  async function handleEmailUnlock() {
-    const trimmed = email.trim();
-    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setEmailError("Please enter a valid email address.");
-      return;
-    }
-    setEmailSubmitting(true);
-    setEmailError("");
-    try {
-      const res = await fetch("/api/public/blog-subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed }),
-      });
-      if (!res.ok && res.status !== 429) {
-        setEmailError("Something went wrong. Please try again.");
-        return;
-      }
-    } catch {
-      // Still unlock — don't block on network failure
-    } finally {
-      setEmailSubmitting(false);
-    }
-    setEmailUnlocked(true);
   }
 
   const elapsed = useElapsed(scan.isPending || isScanning);
@@ -248,8 +218,7 @@ export function Hero() {
                     <p className="text-sm text-slate-500 dark:text-slate-400">No trackers or issues detected.</p>
                   ) : (
                     <div className="space-y-3">
-                      {/* Always show first 2 findings as preview */}
-                      {liveData.findings.slice(0, 2).map((f) => (
+                      {liveData.findings.map((f) => (
                         <FindingRow
                           key={f.id}
                           severity={f.severity}
@@ -258,68 +227,6 @@ export function Hero() {
                           category={f.category}
                         />
                       ))}
-                      {/* Gate remaining findings behind email */}
-                      {liveData.findings.length > 2 && !emailUnlocked && (
-                        <div className="relative">
-                          <div className="space-y-3 blur-sm select-none pointer-events-none" aria-hidden="true">
-                            {liveData.findings.slice(2, 5).map((f) => (
-                              <FindingRow
-                                key={f.id}
-                                severity={f.severity}
-                                title={f.title}
-                                subtitle={f.description}
-                                category={f.category}
-                              />
-                            ))}
-                          </div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-full max-w-sm rounded-xl border border-navy-200 bg-white p-5 shadow-lg dark:border-navy-700 dark:bg-slate-900">
-                              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                {liveData.findings.length - 2} more finding{liveData.findings.length - 2 > 1 ? "s" : ""} hidden
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                Enter your email to see the full report.
-                              </p>
-                              <form
-                                className="mt-3 flex gap-2"
-                                onSubmit={(e) => { e.preventDefault(); handleEmailUnlock(); }}
-                              >
-                                <input
-                                  type="email"
-                                  placeholder="you@company.com"
-                                  value={email}
-                                  onChange={(e) => setEmail(e.target.value)}
-                                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-navy-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                />
-                                <button
-                                  type="submit"
-                                  disabled={emailSubmitting}
-                                  className="shrink-0 rounded-lg bg-navy-950 px-4 py-2 text-sm font-medium text-white hover:bg-navy-900 disabled:opacity-50 dark:bg-navy-600 dark:hover:bg-navy-500"
-                                >
-                                  {emailSubmitting ? "…" : "Unlock"}
-                                </button>
-                              </form>
-                              {emailError && (
-                                <p className="mt-2 text-xs text-red-600 dark:text-red-400">{emailError}</p>
-                              )}
-                              <p className="mt-2 text-[10px] text-slate-400">
-                                We&apos;ll send you weekly privacy tips. Unsubscribe any time.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {/* Show remaining findings once unlocked */}
-                      {liveData.findings.length > 2 && emailUnlocked &&
-                        liveData.findings.slice(2).map((f) => (
-                          <FindingRow
-                            key={f.id}
-                            severity={f.severity}
-                            title={f.title}
-                            subtitle={f.description}
-                            category={f.category}
-                          />
-                        ))}
                     </div>
                   )}
                   <div className="mt-6 rounded-lg border border-navy-200 bg-navy-50 p-4 text-left dark:border-navy-800 dark:bg-navy-950/40">

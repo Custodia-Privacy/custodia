@@ -10,7 +10,6 @@ const footerLinks = {
   Resources: [
     { label: "GDPR Guide", href: "#" },
     { label: "CCPA Guide", href: "#" },
-    { label: "Blog", href: "#" },
     { label: "Documentation", href: "#" },
   ],
   Company: [
