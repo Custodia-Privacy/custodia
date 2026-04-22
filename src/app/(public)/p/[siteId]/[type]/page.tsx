@@ -171,7 +171,7 @@ export default async function PublicPolicyPage({ params }: Props) {
           <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3 sm:px-6">
             {style.logoUrl && (
               <a href={style.logoLink || "/"} className="shrink-0">
-                <img src={style.logoUrl} alt="Logo" className="h-7 w-auto" />
+                <img src={style.logoUrl} alt="Logo" className="h-7 w-auto" referrerPolicy="no-referrer" />
               </a>
             )}
 
