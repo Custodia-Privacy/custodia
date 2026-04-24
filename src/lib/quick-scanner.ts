@@ -5,7 +5,7 @@
  * SSRF: outbound fetch MUST go through `fetchSafely`, which validates
  * DNS resolution and re-checks every redirect hop.
  */
-import { PrismaClient, type FindingCategory, type Severity } from "@prisma/client";
+import { PrismaClient, Prisma, type FindingCategory, type Severity } from "@prisma/client";
 import { fetchSafely, SsrfError } from "./ip-check";
 
 interface TrackerPattern {
@@ -190,6 +190,100 @@ interface QuickScanResult {
   trackersFound: string[];
 }
 
+export interface ParsedCookie {
+  name: string;
+  value: string;
+  domain: string | null;
+  path: string | null;
+  secure: boolean;
+  httpOnly: boolean;
+  sameSite: "Strict" | "Lax" | "None" | null;
+}
+
+/**
+ * Parse a single Set-Cookie header value into structured fields.
+ * We only care about the name + attributes; values are retained for
+ * completeness but not surfaced to the user. Returns null for any
+ * header we can't make sense of.
+ */
+export function parseSetCookie(header: string): ParsedCookie | null {
+  const parts = header.split(";").map((p) => p.trim());
+  if (parts.length === 0) return null;
+
+  const [nameValue, ...attrs] = parts;
+  const eq = nameValue.indexOf("=");
+  if (eq <= 0) return null;
+
+  const name = nameValue.slice(0, eq).trim();
+  const value = nameValue.slice(eq + 1);
+  if (!name) return null;
+
+  const cookie: ParsedCookie = {
+    name,
+    value,
+    domain: null,
+    path: null,
+    secure: false,
+    httpOnly: false,
+    sameSite: null,
+  };
+
+  for (const attr of attrs) {
+    const lower = attr.toLowerCase();
+    if (lower === "secure") cookie.secure = true;
+    else if (lower === "httponly") cookie.httpOnly = true;
+    else if (lower.startsWith("domain=")) {
+      // Normalize leading dot (.example.com → example.com) so host
+      // comparisons are straightforward.
+      cookie.domain = attr.slice(7).trim().replace(/^\./, "").toLowerCase();
+    } else if (lower.startsWith("path=")) {
+      cookie.path = attr.slice(5).trim();
+    } else if (lower.startsWith("samesite=")) {
+      const v = attr.slice(9).trim().toLowerCase();
+      if (v === "strict") cookie.sameSite = "Strict";
+      else if (v === "lax") cookie.sameSite = "Lax";
+      else if (v === "none") cookie.sameSite = "None";
+    }
+  }
+
+  return cookie;
+}
+
+/**
+ * True iff the cookie's domain is the same registrable site as the
+ * scanned domain. This is a deliberately simple check — full eTLD+1
+ * parsing requires the Public Suffix List, which isn't worth pulling in
+ * for a lead-gen scan. `foo.example.com` vs `example.com` counts as
+ * same-site here, which matches how browsers treat them for the
+ * cookie's scoping.
+ */
+export function isSameSite(cookieDomain: string, siteDomain: string): boolean {
+  const cd = cookieDomain.toLowerCase();
+  const sd = siteDomain.toLowerCase();
+  if (cd === sd) return true;
+  if (cd.endsWith("." + sd)) return true;
+  if (sd.endsWith("." + cd)) return true;
+  return false;
+}
+
+/**
+ * Build a user-facing description that highlights why this cookie is
+ * notable. Missing security attributes are called out — a tracking
+ * cookie without Secure or without SameSite is a real finding, not
+ * just noise.
+ */
+function describeCookie(c: ParsedCookie): string {
+  const flags: string[] = [];
+  if (!c.secure) flags.push("no Secure flag");
+  if (!c.httpOnly) flags.push("no HttpOnly flag");
+  if (c.sameSite === null) flags.push("no SameSite attribute");
+  else if (c.sameSite === "None") flags.push("SameSite=None (cross-site tracking allowed)");
+
+  const base = `Set in the HTTP response by ${c.domain}. Third-party cookies are commonly used for tracking, advertising, and cross-site analytics.`;
+  if (flags.length === 0) return base;
+  return `${base} Missing protections: ${flags.join(", ")}.`;
+}
+
 export async function runQuickScan(
   db: PrismaClient,
   scanId: string,
@@ -246,6 +340,7 @@ export async function runQuickScan(
     title: string;
     description: string;
     recommendation: string | null;
+    details?: Prisma.InputJsonValue;
     regulations: string[];
     pageUrl: string;
   }> = [];
@@ -316,23 +411,60 @@ export async function runQuickScan(
     });
   }
 
+  // Parse each Set-Cookie header into structured data and surface one
+  // finding per third-party cookie. Previously we collapsed them into a
+  // single "N third-party cookie(s) set" row, which hid the most useful
+  // information: *which* cookies, set by *whom*. Listing them makes the
+  // report materially more actionable (and, for the public lead-gen scan,
+  // more persuasive — a visitor seeing "_fbp set by .facebook.com" gets
+  // the compliance problem instantly).
   if (setCookieHeaders.length > 0) {
-    const thirdParty = setCookieHeaders.filter((c) => {
-      const domainMatch = c.match(/domain=([^;]+)/i);
-      if (!domainMatch) return false;
-      return !domainMatch[1].includes(domain);
-    });
-    if (thirdParty.length > 0) {
+    const parsedThirdParty = setCookieHeaders
+      .map(parseSetCookie)
+      .filter((c): c is ParsedCookie => c !== null)
+      .filter((c) => c.domain !== null && !isSameSite(c.domain, domain));
+
+    // Cap to keep the report digestible on sites with extreme cookie
+    // counts. If a site has more, we add a single "+N more" row rather
+    // than rendering 80 cards.
+    const MAX_COOKIE_FINDINGS = 20;
+    const visible = parsedThirdParty.slice(0, MAX_COOKIE_FINDINGS);
+    const overflow = parsedThirdParty.length - visible.length;
+
+    for (const cookie of visible) {
       findings.push({
         scanId,
         siteId,
         category: "cookie",
         severity: "warning",
-        title: `${thirdParty.length} third-party cookie(s) set via HTTP headers`,
-        description:
-          "Third-party cookies were set in the HTTP response headers. These may be used for tracking across sites.",
+        title: `Third-party cookie: ${cookie.name} (${cookie.domain})`,
+        description: describeCookie(cookie),
         recommendation:
-          "Review third-party cookies and ensure they are covered by your consent mechanism.",
+          "Ensure this cookie is blocked by your consent mechanism until the visitor opts in, or justify it as strictly necessary with a documented legal basis.",
+        details: {
+          name: cookie.name,
+          domain: cookie.domain,
+          secure: cookie.secure,
+          httpOnly: cookie.httpOnly,
+          sameSite: cookie.sameSite,
+          path: cookie.path,
+        },
+        regulations: ["gdpr", "ccpa"],
+        pageUrl,
+      });
+    }
+
+    if (overflow > 0) {
+      findings.push({
+        scanId,
+        siteId,
+        category: "cookie",
+        severity: "warning",
+        title: `+${overflow} more third-party cookie${overflow === 1 ? "" : "s"} not shown`,
+        description:
+          "The report was capped so results stay readable. Sign up for a full site scan to see every third-party cookie with full attributes.",
+        recommendation:
+          "Run a deeper scan from the dashboard to audit the complete cookie inventory.",
         regulations: ["gdpr", "ccpa"],
         pageUrl,
       });
