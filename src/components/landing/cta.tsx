@@ -91,8 +91,8 @@ export function CTA() {
 
         {!scanId && !scan.error && (
           <p className="mt-4 text-xs text-navy-400">
-            No credit card required. Results in under 60 seconds. Your data is
-            never shared.
+            No credit card required. Results in seconds. We don&apos;t share
+            your scan results with anyone.
           </p>
         )}
         {scan.error && (

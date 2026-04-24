@@ -131,9 +131,10 @@ export function Hero() {
           </h1>
 
           <p className="mt-6 text-lg text-slate-600 dark:text-slate-400">
-            Custodia scans your website, tells you exactly what&apos;s wrong,
-            and fixes it — cookie banners, privacy policies, data requests, all
-            of it. No jargon, no lawyers, no headaches.{" "}
+            Custodia scans your website, shows you what&apos;s wrong, and
+            helps you fix it — generates a cookie banner, a privacy policy,
+            and a data-request workflow from your real site. No jargon, no
+            lawyers to hire.{" "}
             <span className="font-semibold text-navy-700 dark:text-navy-300">From $29/mo.</span>
           </p>
 

@@ -164,7 +164,7 @@ export function ScanPageClient() {
         {/* Results */}
         {isDone && liveData && (
           <div
-            className="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow dark:border-slate-700 dark:bg-slate-900"
+            className="mt-8 scroll-mt-28 overflow-hidden rounded-xl border border-slate-200 bg-white shadow dark:border-slate-700 dark:bg-slate-900"
             ref={resultsRef}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">

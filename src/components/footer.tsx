@@ -2,21 +2,18 @@ import Link from "next/link";
 
 const footerLinks = {
   Product: [
-    { label: "Features", href: "#features" },
-    { label: "Pricing", href: "#pricing" },
-    { label: "Scanner", href: "#cta" },
-    { label: "Dashboard", href: "/dashboard" },
+    { label: "Features", href: "/#features" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "Free scan", href: "/scan" },
+    { label: "How it works", href: "/#how-it-works" },
   ],
-  Resources: [
-    { label: "GDPR Guide", href: "#" },
-    { label: "CCPA Guide", href: "#" },
-    { label: "Documentation", href: "#" },
+  Support: [
+    { label: "FAQ", href: "/#faq" },
+    { label: "Contact", href: "mailto:hello@custodia-privacy.com" },
   ],
-  Company: [
-    { label: "About", href: "#" },
-    { label: "Contact", href: "#" },
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
+  Legal: [
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
   ],
 };
 
@@ -77,8 +74,7 @@ export function Footer() {
 
         <div className="mt-10 border-t border-slate-200 pt-6 dark:border-slate-800">
           <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-            &copy; {new Date().getFullYear()} Custodia Privacy, Inc. All rights
-            reserved.
+            &copy; {new Date().getFullYear()} Custodia Privacy Consulting SAGL. All rights reserved.
           </p>
         </div>
       </div>

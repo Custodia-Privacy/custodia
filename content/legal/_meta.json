@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-04-22T10:56:03.411Z",
+  "scanId": "cf3e2a30-1690-4879-8e1b-a3cc9190197c",
+  "policyVersion": 1,
+  "agentRunId": "b9efeb19-177c-42b3-af65-1f44e99c56b3",
+  "tokensUsed": 4042,
+  "findingsCount": 3,
+  "trackersDetected": [
+    "Google Analytics (GA4)",
+    "reCAPTCHA"
+  ],
+  "model": "claude-sonnet-4-20250514"
+}

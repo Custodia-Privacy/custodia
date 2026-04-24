@@ -4,12 +4,12 @@ import { useState } from "react";
 
 const faqs = [
   {
-    q: "Is this legally binding?",
-    a: "Custodia generates policies and consent mechanisms based on current privacy regulations (GDPR, CCPA, etc.) and best practices. While our AI-generated documents are comprehensive and regularly updated, we recommend having a legal professional review them for your specific situation. Many of our customers use Custodia as their starting point and have their lawyer do a quick review — saving thousands vs. drafting from scratch.",
+    q: "Is this legally binding? Does it replace a lawyer?",
+    a: "No — Custodia generates privacy policies, cookie banners, and consent mechanisms based on current privacy regulations (GDPR, CCPA, and US state laws) and industry best practices, but it is not legal advice. We built it to be a strong starting point, the way template libraries already are for most lawyers. For anything sensitive to your business, a 30-minute review by a privacy attorney on top of Custodia's output costs a fraction of drafting from scratch.",
   },
   {
     q: "Do I really need this?",
-    a: "If your website has any analytics, advertising pixels, or collects any user data (even email addresses), you likely need privacy compliance measures. GDPR applies to any business serving EU visitors, and CCPA/state privacy laws cover most US-based businesses. Fines can be significant — up to 4% of annual revenue under GDPR. Custodia makes compliance affordable and automatic.",
+    a: "If your website runs analytics, advertising pixels, or collects any user data (even just email addresses for a newsletter), you have privacy obligations. GDPR applies to any business serving EU visitors — maximum fines are up to 4% of annual revenue. CCPA and the other US state privacy laws cover most US-based businesses. Custodia gives you the artifacts you need — a scan, a policy, a banner, a DSAR workflow — at a price point that's actually reasonable for a small business.",
   },
   {
     q: "What regulations apply to me?",
@@ -20,8 +20,8 @@ const faqs = [
     a: "A cookie banner is just one piece of the puzzle. Real compliance requires a privacy policy that matches your actual data practices, a way to handle data subject requests (like 'delete my data'), proper consent management across jurisdictions, data mapping, and ongoing monitoring. Custodia provides the complete stack — cookie banner tools like CookieBot only cover the surface.",
   },
   {
-    q: "How does the AI scanner work?",
-    a: "Our scanner uses a headless browser to visit your website exactly like a real user would. It identifies all cookies set, JavaScript trackers loaded, third-party requests made, local storage usage, and fingerprinting techniques. AI then classifies each element by category (analytics, advertising, functional, etc.) and assesses compliance risks.",
+    q: "How does the scanner work?",
+    a: "The free homepage scanner fetches your site's HTML and matches it against a library of known tracker, analytics, and advertising script patterns — Google Analytics, Meta Pixel, Hotjar, Google Ads, and dozens more. It's fast (under a second) and honest about what it can see: it won't catch trackers that only load after consent or deep inside specific pages. That class of coverage is on our roadmap.",
   },
   {
     q: "Can I cancel anytime?",

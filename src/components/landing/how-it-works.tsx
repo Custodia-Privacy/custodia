@@ -3,7 +3,7 @@ const steps = [
     step: "01",
     title: "Scan your site",
     description:
-      "Enter your URL and our AI-powered crawler identifies every cookie, tracker, pixel, and third-party script on your website in under 60 seconds.",
+      "Enter your URL. We check your homepage against a library of known tracker and analytics patterns — Google Analytics, Meta Pixel, Hotjar, and similar — and flag the ones that need consent. Under a second.",
     icon: (
       <path
         strokeLinecap="round"
@@ -27,9 +27,9 @@ const steps = [
   },
   {
     step: "03",
-    title: "Stay compliant automatically",
+    title: "Keep it in sync",
     description:
-      "Weekly re-scans detect new trackers, auto-update policies, and alert you to compliance changes. Your AI privacy team never sleeps.",
+      "Re-scan whenever you ship changes to your site. Custodia surfaces new trackers, missing disclosures, and policy gaps so you can regenerate artifacts in one click instead of starting over.",
     icon: (
       <path
         strokeLinecap="round"
@@ -55,7 +55,7 @@ export function HowItWorks() {
             How it works
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-600 dark:text-slate-400">
-            Go from zero to fully compliant in minutes, not months.
+            Get the privacy infrastructure you need in minutes, not months.
           </p>
         </div>
 
