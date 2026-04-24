@@ -54,14 +54,6 @@ export default function OrganizationSettingsPage() {
     onError: (e) => setBanner(e.message),
   });
 
-  if (isLoading || !summary) {
-    return (
-      <div className="p-6 lg:p-8">
-        <p className="text-sm text-slate-500">Loading organization…</p>
-      </div>
-    );
-  }
-
   const [brandInitialized, setBrandInitialized] = useState(false);
   useEffect(() => {
     if (summary && !brandInitialized) {
@@ -80,6 +72,14 @@ export default function OrganizationSettingsPage() {
     },
     onError: (e) => setBanner(e.message),
   });
+
+  if (isLoading || !summary) {
+    return (
+      <div className="p-6 lg:p-8">
+        <p className="text-sm text-slate-500">Loading organization…</p>
+      </div>
+    );
+  }
 
   const displayName = orgName || summary.name;
   const canEditOrg = summary.role === "owner" || summary.role === "admin";

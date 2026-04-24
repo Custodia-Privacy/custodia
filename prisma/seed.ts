@@ -34,7 +34,7 @@ async function main() {
     process.exit(1);
   }
 
-  let membership = await prisma.orgMember.findFirst({
+  const membership = await prisma.orgMember.findFirst({
     where: { userId: user.id },
     include: { org: true },
   });

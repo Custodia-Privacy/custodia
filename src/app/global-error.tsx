@@ -38,6 +38,11 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
               An unexpected error occurred. Our team has been notified. Please
               try again, or return to the homepage.
             </p>
+            {/* Intentional <a>, not <Link>: this is the top-level error
+                boundary and the Next router context may be the thing that
+                broke. A hard navigation forces a full reload and resets
+                state, which is what we want during recovery. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{
