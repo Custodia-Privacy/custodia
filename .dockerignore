@@ -14,3 +14,8 @@ copy
 logs
 scanner/dist
 .claude
+# Separate sub-project (own package.json, own node_modules, not part of web app).
+# Including it pulled 40k+ files into the Docker build context and made the
+# main tsconfig try to type-check its imports (@modelcontextprotocol/sdk)
+# which are not a dep of the web app.
+mcp-server
