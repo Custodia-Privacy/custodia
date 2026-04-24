@@ -23,6 +23,16 @@ vi.mock("@/lib/utils", () => ({
   slugify: vi.fn((s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")),
 }));
 
+// The real rate limiter backs onto Redis (IORedis). In test mode Redis isn't
+// running, and every test in this file reuses the same client IP (jsdom's
+// Request has no X-Forwarded-For), so by the 6th call the 5/hour budget is
+// exhausted and the route returns 429 instead of the 400 each test expects.
+// We only care about signup's own validation logic here, so stub the limiter
+// to always allow the request through.
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ ok: true, remaining: 999 }),
+}));
+
 import { POST } from "@/app/api/auth/signup/route";
 import { db } from "@/lib/db";
 
