@@ -12,6 +12,9 @@ vi.mock("@/lib/db", () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
     },
+    verificationToken: {
+      create: vi.fn(),
+    },
   },
 }));
 
@@ -35,6 +38,7 @@ vi.mock("@/lib/rate-limit", () => ({
 
 import { POST } from "@/app/api/auth/signup/route";
 import { db } from "@/lib/db";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 function makeRequest(body: unknown): Request {
   return new Request("http://localhost:3000/api/auth/signup", {
@@ -47,6 +51,16 @@ function makeRequest(body: unknown): Request {
 describe("POST /api/auth/signup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks wipes the mockResolvedValue set in the vi.mock factory above,
+    // so re-apply it here — otherwise checkRateLimit returns undefined, the route
+    // reads .ok off it, throws, and every test gets a 500.
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      ok: true,
+      limit: 999,
+      remaining: 999,
+      retryAfterSec: 0,
+      resetAt: Date.now() + 3600_000,
+    });
     vi.mocked(db.user.findUnique).mockResolvedValue(null);
     vi.mocked(db.organization.findUnique).mockResolvedValue(null);
     vi.mocked(db.user.create).mockResolvedValue({
@@ -57,6 +71,11 @@ describe("POST /api/auth/signup", () => {
     vi.mocked(db.organization.create).mockResolvedValue({
       id: "org-1",
       slug: "test-users-organization",
+    } as any);
+    vi.mocked(db.verificationToken.create).mockResolvedValue({
+      identifier: "test@example.com",
+      token: "hashed-token",
+      expires: new Date(),
     } as any);
   });
 
@@ -112,7 +131,13 @@ describe("POST /api/auth/signup", () => {
     );
   });
 
-  it("should return 409 for duplicate email with existing password", async () => {
+  it("should not leak account existence when email is already registered", async () => {
+    // Security: the signup route intentionally returns a generic 201 with
+    // { needsVerification: true } even when the email is already in use with
+    // a password. This prevents account-enumeration via the public endpoint
+    // (attacker sending /signup requests to find valid emails).
+    // No user.create / organization.create should happen — the route should
+    // short-circuit before touching them.
     vi.mocked(db.user.findUnique).mockResolvedValue({
       id: "existing-user",
       email: "test@example.com",
@@ -128,8 +153,10 @@ describe("POST /api/auth/signup", () => {
     const response = await POST(req);
     const body = await response.json();
 
-    expect(response.status).toBe(409);
-    expect(body.error).toContain("already exists");
+    expect(response.status).toBe(201);
+    expect(body.needsVerification).toBe(true);
+    expect(db.user.create).not.toHaveBeenCalled();
+    expect(db.organization.create).not.toHaveBeenCalled();
   });
 
   it("should update invited user (no passwordHash) with credentials", async () => {

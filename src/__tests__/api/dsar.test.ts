@@ -11,8 +11,19 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-vi.mock("@/lib/public-rate-limit", () => ({
-  checkPublicRateLimit: vi.fn().mockReturnValue({ ok: true }),
+// The DSAR route actually uses the Redis-backed general rate limiter,
+// not the standalone public-rate-limit helper. Mock the right module.
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({
+    ok: true,
+    limit: 15,
+    remaining: 15,
+    retryAfterSec: 0,
+    resetAt: Date.now() + 3600_000,
+  }),
+  rateLimitHeaders: vi.fn((result: { retryAfterSec: number }) => ({
+    "Retry-After": String(result.retryAfterSec),
+  })),
 }));
 
 vi.mock("@/lib/dsar-deadlines", () => ({
@@ -27,7 +38,7 @@ vi.mock("resend", () => ({
 
 import { POST } from "@/app/api/public/dsar/route";
 import { db } from "@/lib/db";
-import { checkPublicRateLimit } from "@/lib/public-rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const VALID_SITE_ID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -54,7 +65,13 @@ const validBody = {
 describe("POST /api/public/dsar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(checkPublicRateLimit).mockReturnValue({ ok: true });
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      ok: true,
+      limit: 15,
+      remaining: 15,
+      retryAfterSec: 0,
+      resetAt: Date.now() + 3600_000,
+    });
     vi.mocked(db.site.findFirst).mockResolvedValue({
       id: VALID_SITE_ID,
       orgId: "org-1",
@@ -137,19 +154,28 @@ describe("POST /api/public/dsar", () => {
     expect(response.status).toBe(400);
   });
 
-  it("should return 404 when site is not found", async () => {
+  it("should return a generic 400 when site is not found (no existence leak)", async () => {
+    // Security: the route deliberately returns 400 "request_failed" rather
+    // than 404 "site_not_found", so attackers can't probe which siteIds exist
+    // by submitting forged DSARs.
     vi.mocked(db.site.findFirst).mockResolvedValue(null);
 
     const req = makeRequest(validBody);
     const response = await POST(req);
     const body = await response.json();
 
-    expect(response.status).toBe(404);
-    expect(body.error).toBe("site_not_found");
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("request_failed");
   });
 
   it("should return 429 when rate limited", async () => {
-    vi.mocked(checkPublicRateLimit).mockReturnValue({ ok: false, retryAfterSec: 3500 });
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      ok: false,
+      limit: 15,
+      remaining: 0,
+      retryAfterSec: 3500,
+      resetAt: Date.now() + 3500_000,
+    });
 
     const req = makeRequest(validBody);
     const response = await POST(req);
@@ -196,7 +222,7 @@ describe("POST /api/public/dsar", () => {
     const req = makeRequest(validBody, { "x-forwarded-for": "10.0.0.1" });
     await POST(req);
 
-    expect(checkPublicRateLimit).toHaveBeenCalledWith(
+    expect(checkRateLimit).toHaveBeenCalledWith(
       "dsar:10.0.0.1",
       15,
       expect.any(Number),

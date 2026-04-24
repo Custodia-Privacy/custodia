@@ -12,11 +12,27 @@ vi.mock("@/lib/privacy-webhook", () => ({
   deliverPrivacyWebhook: vi.fn(),
 }));
 
+// Rate limiter is Redis-backed. Stub it out so tests never hit the socket
+// and so all requests in this file fall below the window cap.
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({
+    ok: true,
+    limit: 60,
+    remaining: 60,
+    retryAfterSec: 0,
+    resetAt: Date.now() + 60_000,
+  }),
+  rateLimitHeaders: vi.fn().mockReturnValue({}),
+}));
+
 import { POST, OPTIONS } from "@/app/api/banner/[siteId]/consent/route";
 import { db } from "@/lib/db";
 import { deliverPrivacyWebhook } from "@/lib/privacy-webhook";
+import { checkRateLimit } from "@/lib/rate-limit";
 
-const SITE_ID = "test-site-123";
+// Route validates siteId against a UUID regex and rejects anything else
+// with 400 "Invalid siteId". Use a real UUID here.
+const SITE_ID = "123e4567-e89b-12d3-a456-426614174000";
 
 function makeRequest(
   body: unknown,
@@ -36,9 +52,11 @@ function makeProps() {
   return { params: Promise.resolve({ siteId: SITE_ID }) };
 }
 
+// Route only accepts actions from a fixed set: accept_all | reject_all | customize.
+// "accept_selected" was the old shape; tests that used it silently failed.
 const validBody = {
   consent: { analytics: true, marketing: false },
-  action: "accept_selected",
+  action: "accept_all",
   visitorId: "visitor-abc-123",
   userAgent: "Mozilla/5.0",
 };
@@ -46,12 +64,30 @@ const validBody = {
 describe("POST /api/banner/[siteId]/consent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-apply mock return values that clearAllMocks just wiped.
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      ok: true,
+      limit: 60,
+      remaining: 60,
+      retryAfterSec: 0,
+      resetAt: Date.now() + 60_000,
+    });
     vi.mocked(db.consentLog.create).mockResolvedValue({
       id: "log-1",
       siteId: SITE_ID,
       visitorId: "visitor-abc-123",
     } as any);
-    vi.mocked(db.site.findUnique).mockResolvedValue(null);
+    // Default: the site exists so the happy path can reach the create call.
+    // Individual tests can override when they want to test not-found / webhook
+    // behavior.
+    vi.mocked(db.site.findUnique).mockResolvedValue({
+      id: SITE_ID,
+      orgId: "org-1",
+      domain: "example.com",
+      deletedAt: null,
+      privacyWebhookUrl: null,
+      privacyWebhookSecret: null,
+    } as any);
   });
 
   it("should record consent and return ok:true", async () => {
@@ -72,18 +108,18 @@ describe("POST /api/banner/[siteId]/consent", () => {
         siteId: SITE_ID,
         visitorId: "visitor-abc-123",
         consentGiven: validBody.consent,
-        action: "accept_selected",
+        action: "accept_all",
       }),
     });
   });
 
   it("should return 400 when consent field is missing", async () => {
-    const req = makeRequest({ action: "accept", visitorId: "v1" });
+    const req = makeRequest({ action: "accept_all", visitorId: "v1" });
     const response = await POST(req, makeProps());
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body.error).toContain("Missing");
+    expect(body.error).toContain("Invalid consent");
   });
 
   it("should return 400 when action field is missing", async () => {
@@ -93,7 +129,7 @@ describe("POST /api/banner/[siteId]/consent", () => {
   });
 
   it("should return 400 when visitorId is missing", async () => {
-    const req = makeRequest({ consent: { analytics: true }, action: "accept" });
+    const req = makeRequest({ consent: { analytics: true }, action: "accept_all" });
     const response = await POST(req, makeProps());
     expect(response.status).toBe(400);
   });
