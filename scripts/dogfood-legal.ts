@@ -152,12 +152,14 @@ async function main() {
  * same output template can be reused by tenants.
  */
 function substitutePlaceholders(md: string): string {
+  const today = new Date().toISOString().split("T")[0];
   return md
     .replace(/\[ORGANIZATION_NAME\]/g, "Custodia")
     .replace(/\[CONTACT_EMAIL\]/g, "privacy@custodia-privacy.com")
     .replace(/\[DPO_NAME\]/g, "Custodia Privacy Team")
-    .replace(/\[Effective Date\]/g, new Date().toISOString().split("T")[0])
-    .replace(/\[Last Updated\]/g, new Date().toISOString().split("T")[0]);
+    .replace(/\[Effective Date\]/g, today)
+    .replace(/\[Last Updated\]/g, today)
+    .replace(/\[DATE\]/g, today);
 }
 
 async function generateTerms(): Promise<string> {

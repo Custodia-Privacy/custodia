@@ -11,6 +11,10 @@ const handler = (req: Request) =>
     req,
     router: appRouter,
     createContext: () => createTRPCContext({ headers: req.headers }),
+    // Allow queries to be sent as POST (paired with `methodOverride: "POST"`
+    // on the client's httpBatchLink). Required because Cloudflare's managed
+    // WAF blocks tRPC's URL-encoded GET query strings as suspected injection.
+    allowMethodOverride: true,
   });
 
 export { handler as GET, handler as POST };

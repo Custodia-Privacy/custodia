@@ -32,6 +32,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
         httpBatchLink({
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
+          // Force POST for queries too. Cloudflare's managed WAF flags the
+          // URL-encoded JSON pattern tRPC puts in GET query strings
+          // (input=%7B%220%22%3A%7B%22json%22%3A...) as potential injection
+          // and returns 403. POST bodies aren't inspected the same way.
+          // See: scan.quickResult was returning CF 403 in prod even though
+          // origin responded 200 in ~13ms.
+          methodOverride: "POST",
         }),
       ],
     }),

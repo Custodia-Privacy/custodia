@@ -25,11 +25,13 @@ const globalForHealth = globalThis as unknown as {
 
 function getHealthRedis(): IORedis {
   if (globalForHealth.healthRedis) return globalForHealth.healthRedis;
+  // Keep lazyConnect so module load never crashes when Redis is cold.
+  // Leave offline queue enabled — ping() needs to wait for the socket
+  // to open on first call. Outer Promise.race bounds total time.
   const client = new IORedis(REDIS_URL, {
     maxRetriesPerRequest: 1,
     lazyConnect: true,
     connectTimeout: 2000,
-    enableOfflineQueue: false,
   });
   client.on("error", () => {
     // Swallow — the ping() caller handles the rejection. Without this
@@ -51,6 +53,8 @@ async function checkDb(): Promise<boolean> {
 async function checkRedis(): Promise<boolean> {
   try {
     const client = getHealthRedis();
+    // With lazyConnect, the first ping triggers a connect attempt. If the
+    // client is already "ready" (singleton cached), ping() just returns PONG.
     const pong = await Promise.race([
       client.ping(),
       new Promise<never>((_, rej) =>
