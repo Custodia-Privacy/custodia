@@ -35,14 +35,23 @@ jobs:
       - name: Pull latest code
         run: git -C ${{ github.workspace }} pull origin main
 
-      - name: Stage environment file
-        # .env.docker is intentionally git-ignored (contains Redis password,
-        # Resend key, Stripe key, etc.). Keep the canonical copy in
-        # ~/.custodia/ on the host and stage it into the workspace before
-        # docker compose needs it. The dev workflow (compose up from my
-        # laptop) used the file directly in the repo; CI runs from a
-        # fresh checkout so it has to be placed in.
-        run: cp ~/.custodia/.env.docker ${{ github.workspace }}/.env.docker
+      - name: Stage environment files
+        # Two separate env files, both git-ignored, both needed:
+        #   .env         -> consumed at compose-time for ${VAR} interpolation
+        #                   in docker-compose.yml (REDIS_PASSWORD feeds the
+        #                   redis `--requirepass` flag, POSTGRES_PASSWORD
+        #                   feeds the postgres container env, etc.)
+        #   .env.docker  -> consumed at runtime via `env_file:` directive;
+        #                   sets REDIS_URL, DATABASE_URL, API keys, etc.
+        #                   inside the app/scanner containers
+        # Skipping .env caused Redis to boot with its default password
+        # (custodia_redis_dev) while the app/scanner used the real one
+        # from .env.docker — scanner then sat in a WRONGPASS auth loop.
+        # Canonical copies live in ~/.custodia/ (chmod 600). Rotate
+        # secrets there, never in the repo.
+        run: |
+          cp ~/.custodia/.env ${{ github.workspace }}/.env
+          cp ~/.custodia/.env.docker ${{ github.workspace }}/.env.docker
 
       - name: Tag current image for rollback
         run: |
