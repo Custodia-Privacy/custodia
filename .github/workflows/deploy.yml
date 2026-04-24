@@ -35,6 +35,15 @@ jobs:
       - name: Pull latest code
         run: git -C ${{ github.workspace }} pull origin main
 
+      - name: Stage environment file
+        # .env.docker is intentionally git-ignored (contains Redis password,
+        # Resend key, Stripe key, etc.). Keep the canonical copy in
+        # ~/.custodia/ on the host and stage it into the workspace before
+        # docker compose needs it. The dev workflow (compose up from my
+        # laptop) used the file directly in the repo; CI runs from a
+        # fresh checkout so it has to be placed in.
+        run: cp ~/.custodia/.env.docker ${{ github.workspace }}/.env.docker
+
       - name: Tag current image for rollback
         run: |
           cd ${{ github.workspace }}
