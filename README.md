@@ -42,17 +42,18 @@ Docker Compose includes `pii-engine` and `inventory-worker` services. Apply DB m
 
 ## Production Deployment
 
-Custodia runs on the founder's local machine and is reachable via **Cloudflare Tunnel** — no port forwarding, no dynamic IP issues, free SSL.
+Custodia runs on a **long-lived host** (Docker Compose) and is reachable via **Cloudflare Tunnel** — not Cloudflare Workers for the web app. See **[`docs/AGENT-DEPLOYMENT.md`](docs/AGENT-DEPLOYMENT.md)** for the full agent/operator runbook (CI steps, secrets layout, rollback, troubleshooting).
 
 ### Architecture
 
 ```
-Internet → Cloudflare → cloudflared tunnel → localhost:3100 (Next.js app)
-                                           → postgres:5432 (internal only)
-                                           → redis:6379    (internal only)
+Internet → Cloudflare → cloudflared tunnel → localhost:3000 (Next.js app in Docker)
+                                           → postgres / redis (internal Docker network)
 ```
 
-All services run via Docker Compose. Deploys trigger automatically on push to `main` via a self-hosted GitHub Actions runner on the same machine.
+The `app` service publishes **`127.0.0.1:3000`** → container `3000` (see `docker-compose.yml`). Point tunnel ingress at that URL unless you change ports.
+
+All services run via Docker Compose. Deploys trigger automatically on push to `main` via a **self-hosted** GitHub Actions runner on the same machine.
 
 ---
 
@@ -103,18 +104,20 @@ cloudflared tunnel route dns custodia app.custodia-privacy.com
 
 Then go to [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/) → Networks → Tunnels → `custodia` → Configure → copy the **Tunnel Token**.
 
-Add it to `.env`:
+Add it to `.env` (use the real token from the Cloudflare dashboard — do not commit this file):
+
 ```
-CLOUDFLARE_TUNNEL_TOKEN=eyJ...
+CLOUDFLARE_TUNNEL_TOKEN=<paste-token-here>
 ```
 
-The tunnel config (`~/.cloudflared/config.yml`) should point to the app:
+The tunnel config (`~/.cloudflared/config.yml`) should point to the app (match Docker’s published port):
+
 ```yaml
 tunnel: custodia
 credentials-file: ~/.cloudflared/<tunnel-id>.json
 ingress:
   - hostname: app.custodia-privacy.com
-    service: http://localhost:3100
+    service: http://localhost:3000
   - service: http_status:404
 ```
 
@@ -124,7 +127,7 @@ ingress:
 docker compose up -d --build
 ```
 
-Starts: Next.js app (port 3100), scanner worker, Postgres, Redis, and cloudflared tunnel.
+Starts: Next.js app (host **3000** → container 3000), scanner worker, Postgres, Redis, plus any optional services in `docker-compose.yml`. Run `cloudflared` separately if it is not a Compose service in your setup.
 
 Verify:
 ```bash

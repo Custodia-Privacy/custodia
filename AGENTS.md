@@ -156,3 +156,9 @@ npm run dev
 # MCP server (separate terminal)
 cd mcp-server && npx tsx src/index.ts
 ```
+
+## Shipping to production
+
+**Canonical runbook:** [`docs/AGENT-DEPLOYMENT.md`](docs/AGENT-DEPLOYMENT.md)
+
+Summary: production is **Docker Compose + Cloudflare Tunnel** on a host with a **self-hosted GitHub Actions** runner — **not** Cloudflare Workers for the Next.js app. Pushes to **`main`** run lint, type-check, tests (Node **22**), then `docker compose up -d --build`. Secrets are copied from **`~/.custodia/`** on the host at deploy time; **never** commit `.env`, `.env.local`, `.env.docker`, or real API keys. Before every `git push origin main`, run the checklist in that doc and inspect `git diff` for accidental secrets.
