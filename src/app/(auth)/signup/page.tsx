@@ -39,10 +39,31 @@ export default function SignupPage() {
         body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await res.json();
+      const ct = res.headers.get("content-type") ?? "";
+      let data: Record<string, unknown> = {};
+      if (ct.includes("application/json")) {
+        try {
+          data = (await res.json()) as Record<string, unknown>;
+        } catch {
+          setError(`Signup failed (${res.status}). Invalid response from server.`);
+          setLoading(false);
+          return;
+        }
+      } else {
+        const text = await res.text();
+        setError(text.trim().slice(0, 200) || `Signup failed (${res.status})`);
+        setLoading(false);
+        return;
+      }
 
       if (!res.ok) {
-        setError(data.error ?? "Signup failed");
+        const details = data.details as { fieldErrors?: Record<string, string[]> } | undefined;
+        const pwErr = details?.fieldErrors?.password?.[0];
+        setError(
+          (typeof data.error === "string" && data.error) ||
+            pwErr ||
+            `Signup failed (${res.status})`,
+        );
         setLoading(false);
         return;
       }
@@ -54,6 +75,12 @@ export default function SignupPage() {
         );
         setLoading(false);
         return;
+      }
+
+      if (data.verificationEmailFailed) {
+        setInfo(
+          "We could not send the verification email, so your account was activated anyway. You can sign in now; consider updating your email settings if this persists.",
+        );
       }
 
       const trimmedEmail = email.trim().toLowerCase();

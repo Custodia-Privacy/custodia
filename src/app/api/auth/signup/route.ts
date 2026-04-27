@@ -48,28 +48,40 @@ const signupSchema = z.object({
   orgName: z.string().min(1).max(255).optional(),
 });
 
-async function sendVerificationEmail(email: string, token: string): Promise<void> {
+/** @returns true if Resend accepted the message */
+async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     log.warn("RESEND_API_KEY not set — skipping verification email");
-    return;
+    return false;
   }
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const verifyUrl = `${appUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
 
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: "Custodia <noreply@custodia-privacy.com>",
-      to: [email],
-      subject: "Verify your email — Custodia",
-      html: `<p>Click the link below to verify your email address:</p>
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        from: "Custodia <noreply@custodia-privacy.com>",
+        to: [email],
+        subject: "Verify your email — Custodia",
+        html: `<p>Click the link below to verify your email address:</p>
         <p><a href="${verifyUrl}">Verify email</a></p>
         <p>This link expires in 24 hours.</p>
         <p style="color:#888;font-size:12px">If you didn't sign up for Custodia, ignore this email.</p>`,
-    }),
-  });
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      log.error("Resend API error", { status: res.status, body: body.slice(0, 500) });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    log.error("Resend fetch failed", err);
+    return false;
+  }
 }
 
 export async function POST(req: Request) {
@@ -110,7 +122,21 @@ export async function POST(req: Request) {
         await db.verificationToken.create({
           data: { identifier: input.email, token: verificationToken, expires: tokenExpiry },
         });
-        await sendVerificationEmail(input.email, rawToken);
+        const sent = await sendVerificationEmail(input.email, rawToken);
+        if (!sent) {
+          await db.user.update({
+            where: { id: existing.id },
+            data: { emailVerifiedAt: new Date() },
+          });
+          log.warn("Verification email failed — user marked verified (existing user path)");
+          return NextResponse.json({
+            success: true,
+            userId: existing.id,
+            needsVerification: false,
+            canSignInNow: true,
+            verificationEmailFailed: true,
+          });
+        }
       }
       return NextResponse.json({
         success: true,
@@ -150,16 +176,26 @@ export async function POST(req: Request) {
       },
     });
 
+    let verificationEmailFailed = false;
     if (inboxOnly) {
-      await sendVerificationEmail(input.email, rawToken);
+      const sent = await sendVerificationEmail(input.email, rawToken);
+      if (!sent) {
+        await db.user.update({
+          where: { id: user.id },
+          data: { emailVerifiedAt: new Date() },
+        });
+        log.warn("Verification email failed — user marked verified (new user path)");
+        verificationEmailFailed = true;
+      }
     }
 
     return NextResponse.json(
       {
         success: true,
         userId: user.id,
-        needsVerification: inboxOnly,
-        canSignInNow: !inboxOnly,
+        needsVerification: inboxOnly && !verificationEmailFailed,
+        canSignInNow: !inboxOnly || verificationEmailFailed,
+        ...(verificationEmailFailed ? { verificationEmailFailed: true } : {}),
       },
       { status: 201 },
     );

@@ -59,11 +59,17 @@ function applySecurityHeaders(
       "Content-Security-Policy",
       "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' data: https://cdn.jsdelivr.net; connect-src 'self' https:; frame-ancestors 'none';",
     );
+  } else if (pathname.startsWith("/api/auth")) {
+    // Auth endpoints return JSON/HTML fragments for NextAuth — avoid document CSP
+    // here (it applied to all routes and blocked Plausible + broke some browsers’
+    // handling of credential posts when combined with third-party scripts).
+    response.headers.set("X-Frame-Options", "DENY");
   } else if (pathname.startsWith("/embed/") === false) {
     response.headers.set("X-Frame-Options", "DENY");
     response.headers.set(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';",
+      // Plausible (root layout) — allow script + beacon to plausible.io
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://plausible.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: https://plausible.io; frame-ancestors 'none';",
     );
   }
 }

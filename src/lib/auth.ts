@@ -20,9 +20,14 @@ const googleSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 const githubId = process.env.GITHUB_CLIENT_ID?.trim();
 const githubSecret = process.env.GITHUB_CLIENT_SECRET?.trim();
 
+const hasOAuth =
+  Boolean(googleId && googleSecret) || Boolean(githubId && githubSecret);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  adapter: PrismaAdapter(db) as any,
+  // Prisma adapter is only required for OAuth/account linking. JWT + credentials
+  // alone can misbehave with the adapter on some Auth.js + Prisma versions.
+  ...(hasOAuth ? { adapter: PrismaAdapter(db) as any } : {}),
   providers: [
     ...(googleId && googleSecret
       ? [
