@@ -1,0 +1,10 @@
+{
+  "items": [
+    {
+      "spans": [
+        { "label": "private_person", "score": 0.99, "start": 11, "end": 22 },
+        { "label": "private_email", "score": 0.98, "start": 40, "end": 62 }
+      ]
+    }
+  ]
+}

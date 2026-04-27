@@ -64,6 +64,55 @@ services:
         max-size: "25m"
         max-file: "3"
 
+  pii-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.pii-engine
+    container_name: custodia-pii-engine
+    restart: unless-stopped
+    networks:
+      - custodia
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  inventory-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.inventory-worker
+    container_name: custodia-inventory-worker
+    restart: unless-stopped
+    networks:
+      - custodia
+    env_file: .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pii-engine:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
   postgres:
     image: postgres:16-alpine
     container_name: custodia-postgres

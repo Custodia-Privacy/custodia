@@ -16,6 +16,7 @@ import { assistantRouter } from "./routers/assistant";
 import { apiKeyRouter } from "./routers/apiKey";
 import { findingRouter } from "./routers/finding";
 import { integrationsRouter } from "./routers/integrations";
+import { inventoryRouter } from "./routers/inventory";
 
 export const appRouter = createRouter({
   site: siteRouter,
@@ -35,6 +36,7 @@ export const appRouter = createRouter({
   assistant: assistantRouter,
   apiKey: apiKeyRouter,
   integrations: integrationsRouter,
+  inventory: inventoryRouter,
 });
 
 export type AppRouter = typeof appRouter;

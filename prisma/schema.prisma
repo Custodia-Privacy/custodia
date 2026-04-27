@@ -119,6 +119,15 @@ model Organization {
   webhookSubscriptions   WebhookSubscription[]
   integrations           Integration[]
 
+  // Data Inventory (catalogue, PII scans, retention, deletion receipts)
+  dataAssets              DataAsset[]
+  inventoryScanRuns       InventoryScanRun[]
+  retentionPolicies       RetentionPolicy[]
+  minimizationPolicies      MinimizationPolicy[]
+  deletionExecutionRuns   DeletionExecutionRun[]
+  deletionReceipts        DeletionReceipt[]
+  piiFindings             PiiFinding[]
+
   @@map("organizations")
 }
 
@@ -479,6 +488,7 @@ model DsarRequest {
   org        Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   site       Site?          @relation(fields: [siteId], references: [id], onDelete: SetNull)
   activities DsarActivity[]
+  deletionRuns DeletionExecutionRun[]
 
   @@index([orgId, status])
   @@index([orgId, dueDate])
@@ -620,6 +630,8 @@ model DataStore {
   org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   sourceFlows  DataFlow[]   @relation("sourceFlows")
   targetFlows  DataFlow[]   @relation("targetFlows")
+  /// Optional 1:1 mirror row in the new inventory catalogue
+  inventoryMirror DataAsset? @relation("DataStoreInventory")
 
   @@index([orgId, type])
   @@map("data_stores")
@@ -822,6 +834,8 @@ model Integration {
 
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   syncLogs SyncLog[]
+  dataAssets DataAsset[]
+  deletionTasks DeletionTask[]
 
   @@unique([orgId, provider])
   @@map("integrations")
@@ -841,4 +855,272 @@ model SyncLog {
 
   @@index([integrationId, createdAt(sort: Desc)])
   @@map("sync_logs")
+}
+
+// ─── Data Inventory & Catalogue (PII scans, retention, deletion receipts) ───
+
+enum DataAssetKind {
+  source
+  data_system
+  database
+  schema
+  table
+  collection
+  bucket
+  folder
+  file
+  field
+}
+
+enum DataAssetStatus {
+  active
+  archived
+  error
+}
+
+enum InventoryScanRunStatus {
+  queued
+  running
+  completed
+  failed
+  cancelled
+}
+
+enum DeletionExecutionStatus {
+  pending
+  running
+  completed
+  failed
+  cancelled
+}
+
+enum DeletionTaskStatus {
+  pending
+  running
+  completed
+  failed
+  skipped
+}
+
+/// Hierarchical catalogue node (systems, tables, fields, buckets, …)
+model DataAsset {
+  id                String          @id @default(uuid()) @db.Uuid
+  orgId             String          @map("org_id") @db.Uuid
+  parentId          String?         @map("parent_id") @db.Uuid
+  kind              DataAssetKind
+  provider          String          @db.VarChar(100)
+  name              String          @db.VarChar(512)
+  externalRef       String?         @map("external_ref") @db.VarChar(1024)
+  config            Json            @default("{}")
+  /// Back-link when this asset was migrated from a legacy governance DataStore
+  legacyDataStoreId String?         @unique @map("legacy_data_store_id") @db.Uuid
+  integrationId     String?         @map("integration_id") @db.Uuid
+  lastScanAt        DateTime?       @map("last_scan_at")
+  status              DataAssetStatus @default(active)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent         DataAsset?   @relation("DataAssetTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children       DataAsset[]  @relation("DataAssetTree")
+  legacyStore    DataStore?   @relation("DataStoreInventory", fields: [legacyDataStoreId], references: [id], onDelete: SetNull)
+  integration    Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  fields         DataAssetField[]
+  findings       PiiFinding[]
+  retentionTargets    RetentionPolicyTarget[]
+  minimizationTargets MinimizationPolicyTarget[]
+
+  @@index([orgId, kind])
+  @@index([orgId, parentId])
+  @@map("data_assets")
+}
+
+model DataAssetField {
+  id          String   @id @default(uuid()) @db.Uuid
+  tableAssetId String  @map("table_asset_id") @db.Uuid
+  name        String   @db.VarChar(512)
+  externalRef String?  @map("external_ref") @db.VarChar(1024)
+  dataType    String?  @map("data_type") @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  table    DataAsset    @relation(fields: [tableAssetId], references: [id], onDelete: Cascade)
+  findings PiiFinding[]
+
+  @@unique([tableAssetId, name])
+  @@index([tableAssetId])
+  @@map("data_asset_fields")
+}
+
+model InventoryScanRun {
+  id           String                 @id @default(uuid()) @db.Uuid
+  orgId        String                 @map("org_id") @db.Uuid
+  status       InventoryScanRunStatus @default(queued)
+  trigger      String                 @default("manual") @db.VarChar(50)
+  errorMessage String?                @map("error_message") @db.Text
+  summary      Json?
+  startedAt    DateTime?              @map("started_at")
+  completedAt  DateTime?              @map("completed_at")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  findings PiiFinding[]
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("inventory_scan_runs")
+}
+
+/// Aggregated PII label hits for an asset/field within a scan run (Privacy Filter taxonomy)
+model PiiFinding {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  scanRunId  String   @map("scan_run_id") @db.Uuid
+  assetId    String   @map("asset_id") @db.Uuid
+  fieldId    String?  @map("field_id") @db.Uuid
+  label      String   @db.VarChar(64)
+  avgScore   Float    @map("avg_score")
+  hitCount   Int      @default(0) @map("hit_count")
+  evidence   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  org     Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  scanRun InventoryScanRun @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+  asset   DataAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  field   DataAssetField?  @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+
+  @@index([scanRunId])
+  @@index([orgId, label])
+  @@map("pii_findings")
+}
+
+model RetentionPolicy {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  enabled     Boolean  @default(true)
+  /// Primary rule: delete personal data records older than N days (null = policy-defined in JSON only)
+  ruleDays    Int?     @map("rule_days")
+  rules       Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org      Organization            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  targets  RetentionPolicyTarget[]
+  deletionRuns DeletionExecutionRun[]
+
+  @@index([orgId])
+  @@map("retention_policies")
+}
+
+model RetentionPolicyTarget {
+  id                String @id @default(uuid()) @db.Uuid
+  retentionPolicyId String @map("retention_policy_id") @db.Uuid
+  dataAssetId       String @map("data_asset_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  policy RetentionPolicy @relation(fields: [retentionPolicyId], references: [id], onDelete: Cascade)
+  asset  DataAsset       @relation(fields: [dataAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([retentionPolicyId, dataAssetId])
+  @@map("retention_policy_targets")
+}
+
+model MinimizationPolicy {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  enabled     Boolean  @default(true)
+  rules       Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org     Organization             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  targets MinimizationPolicyTarget[]
+
+  @@index([orgId])
+  @@map("minimization_policies")
+}
+
+model MinimizationPolicyTarget {
+  id                   String @id @default(uuid()) @db.Uuid
+  minimizationPolicyId String @map("minimization_policy_id") @db.Uuid
+  dataAssetId          String @map("data_asset_id") @db.Uuid
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  policy MinimizationPolicy @relation(fields: [minimizationPolicyId], references: [id], onDelete: Cascade)
+  asset  DataAsset          @relation(fields: [dataAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([minimizationPolicyId, dataAssetId])
+  @@map("minimization_policy_targets")
+}
+
+model DeletionExecutionRun {
+  id                String                   @id @default(uuid()) @db.Uuid
+  orgId             String                   @map("org_id") @db.Uuid
+  dsarRequestId     String?                  @map("dsar_request_id") @db.Uuid
+  retentionPolicyId String?                  @map("retention_policy_id") @db.Uuid
+  dryRun            Boolean                  @default(true) @map("dry_run")
+  approved          Boolean                  @default(false) @map("approved")
+  status            DeletionExecutionStatus  @default(pending)
+  createdByUserId   String?                  @map("created_by_user_id") @db.Uuid
+  startedAt         DateTime?                @map("started_at")
+  completedAt       DateTime?                @map("completed_at")
+  errorMessage      String?                  @map("error_message") @db.Text
+  summary           Json?
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  org             Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  dsar            DsarRequest?    @relation(fields: [dsarRequestId], references: [id], onDelete: SetNull)
+  retentionPolicy RetentionPolicy? @relation(fields: [retentionPolicyId], references: [id], onDelete: SetNull)
+  tasks           DeletionTask[]
+  receipts        DeletionReceipt[] @relation("RunReceipts")
+
+  @@index([orgId, status])
+  @@index([dsarRequestId])
+  @@map("deletion_execution_runs")
+}
+
+model DeletionTask {
+  id              String             @id @default(uuid()) @db.Uuid
+  runId           String             @map("run_id") @db.Uuid
+  integrationId   String?            @map("integration_id") @db.Uuid
+  idempotencyKey  String             @unique @map("idempotency_key") @db.VarChar(255)
+  provider        String             @db.VarChar(50)
+  externalRecordId String            @map("external_record_id") @db.VarChar(512)
+  subjectEmail    String?            @map("subject_email") @db.VarChar(512)
+  status          DeletionTaskStatus @default(pending)
+  result          Json?
+  error           String?            @db.Text
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  run         DeletionExecutionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  integration Integration?       @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  @@index([runId])
+  @@map("deletion_tasks")
+}
+
+/// Append-only integrity chain for destructive operations (HMAC over payload + prev hash)
+model DeletionReceipt {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  runId       String?  @map("run_id") @db.Uuid
+  taskId      String?  @map("task_id") @db.Uuid
+  prevHash    String?  @map("prev_hash") @db.VarChar(128)
+  payloadHash String   @map("payload_hash") @db.VarChar(128)
+  signature   String   @db.VarChar(256)
+  payload     Json
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  org Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  run DeletionExecutionRun?  @relation("RunReceipts", fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([runId])
+  @@map("deletion_receipts")
 }

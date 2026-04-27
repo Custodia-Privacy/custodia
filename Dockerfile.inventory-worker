@@ -1,0 +1,9 @@
+FROM node:22-alpine
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+RUN npm ci
+COPY . .
+ENV NODE_ENV=production
+CMD ["npx", "tsx", "src/workers/inventory-workers.ts"]

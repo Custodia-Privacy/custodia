@@ -1,6 +1,7 @@
 /**
  * Signup API route — creates a new user with email/password.
- * After signup, the user must verify their email before signing in.
+ * By default, email must be verified (inbox link) before credentials sign-in.
+ * If `RESEND_API_KEY` is unset or `SIGNUP_AUTO_VERIFY=true`, the account is verified immediately.
  */
 import { NextResponse } from "next/server";
 import { randomBytes, createHash } from "node:crypto";
@@ -18,6 +19,24 @@ const COMMON_PASSWORDS = new Set([
   "password1234", "123456789012", "qwertyuiop12", "letmein12345",
   "admin1234567", "welcome12345", "password1!", "changeme1234",
 ]);
+
+/** When true, set `emailVerifiedAt` immediately (empty prod / no Resend). See .env.example. */
+function shouldVerifyEmailViaInboxOnly(): boolean {
+  const forceInbox =
+    process.env.SIGNUP_AUTO_VERIFY === "false" || process.env.SIGNUP_AUTO_VERIFY === "0";
+  if (forceInbox) return true;
+  const auto = process.env.SIGNUP_AUTO_VERIFY === "true" || process.env.SIGNUP_AUTO_VERIFY === "1";
+  if (auto) {
+    log.warn("SIGNUP_AUTO_VERIFY=true — marking new signups as email-verified without inbox step");
+    return false;
+  }
+  const hasResend = Boolean(process.env.RESEND_API_KEY?.trim());
+  if (!hasResend) {
+    log.warn("RESEND_API_KEY unset — marking new signups as email-verified (no verification email)");
+    return false;
+  }
+  return true;
+}
 
 const signupSchema = z.object({
   email: z.string().email(),
@@ -67,12 +86,13 @@ export async function POST(req: Request) {
     const existing = await db.user.findUnique({ where: { email: input.email } });
     if (existing?.passwordHash) {
       return NextResponse.json(
-        { success: true, needsVerification: true },
+        { success: true, needsVerification: true, canSignInNow: false },
         { status: 201 },
       );
     }
 
     const passwordHash = await hashPassword(input.password);
+    const inboxOnly = shouldVerifyEmailViaInboxOnly();
     const rawToken = randomBytes(32).toString("hex");
     const verificationToken = createHash("sha256").update(rawToken).digest("hex");
     const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -80,13 +100,24 @@ export async function POST(req: Request) {
     if (existing) {
       await db.user.update({
         where: { id: existing.id },
-        data: { name: input.name, passwordHash },
+        data: {
+          name: input.name,
+          passwordHash,
+          ...(!inboxOnly ? { emailVerifiedAt: new Date() } : {}),
+        },
       });
-      await db.verificationToken.create({
-        data: { identifier: input.email, token: verificationToken, expires: tokenExpiry },
+      if (inboxOnly) {
+        await db.verificationToken.create({
+          data: { identifier: input.email, token: verificationToken, expires: tokenExpiry },
+        });
+        await sendVerificationEmail(input.email, rawToken);
+      }
+      return NextResponse.json({
+        success: true,
+        userId: existing.id,
+        needsVerification: inboxOnly,
+        canSignInNow: !inboxOnly,
       });
-      await sendVerificationEmail(input.email, rawToken);
-      return NextResponse.json({ success: true, userId: existing.id, needsVerification: true });
     }
 
     const user = await db.user.create({
@@ -94,12 +125,15 @@ export async function POST(req: Request) {
         email: input.email,
         name: input.name,
         passwordHash,
+        ...(!inboxOnly ? { emailVerifiedAt: new Date() } : {}),
       },
     });
 
-    await db.verificationToken.create({
-      data: { identifier: input.email, token: verificationToken, expires: tokenExpiry },
-    });
+    if (inboxOnly) {
+      await db.verificationToken.create({
+        data: { identifier: input.email, token: verificationToken, expires: tokenExpiry },
+      });
+    }
 
     const orgName = input.orgName || `${input.name}'s Organization`;
     const baseSlug = slugify(orgName);
@@ -116,10 +150,17 @@ export async function POST(req: Request) {
       },
     });
 
-    await sendVerificationEmail(input.email, rawToken);
+    if (inboxOnly) {
+      await sendVerificationEmail(input.email, rawToken);
+    }
 
     return NextResponse.json(
-      { success: true, userId: user.id, needsVerification: true },
+      {
+        success: true,
+        userId: user.id,
+        needsVerification: inboxOnly,
+        canSignInNow: !inboxOnly,
+      },
       { status: 201 },
     );
   } catch (err) {

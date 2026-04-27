@@ -5,6 +5,30 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+/** Auth.js / NextAuth may split large JWT session cookies into `.0`, `.1`, … */
+function hasSessionCookie(request: NextRequest): boolean {
+  const exact = [
+    "__Secure-next-auth.session-token",
+    "next-auth.session-token",
+    "authjs.session-token",
+    "__Secure-authjs.session-token",
+  ];
+  for (const name of exact) {
+    if (request.cookies.get(name)?.value) return true;
+  }
+  for (const { name } of request.cookies.getAll()) {
+    if (
+      name.startsWith("authjs.session-token.") ||
+      name.startsWith("__Secure-authjs.session-token.") ||
+      name.startsWith("next-auth.session-token.") ||
+      name.startsWith("__Secure-next-auth.session-token.")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const SECURITY_HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "X-Content-Type-Options": "nosniff",
@@ -13,8 +37,16 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-DNS-Prefetch-Control": "off",
 };
 
-function applySecurityHeaders(response: NextResponse, pathname: string): void {
+function applySecurityHeaders(
+  response: NextResponse,
+  pathname: string,
+  request: NextRequest,
+): void {
+  const isHttps = request.nextUrl.protocol === "https:";
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    // Never send HSTS over plain HTTP (e.g. local dev). Browsers cache it and may
+    // force HTTPS on localhost, which breaks NextAuth cookies and sign-in.
+    if (key === "Strict-Transport-Security" && !isHttps) continue;
     response.headers.set(key, value);
   }
 
@@ -44,6 +76,7 @@ export function proxy(request: NextRequest) {
     "/pricing",
     "/login",
     "/signup",
+    "/forgot-password",
     "/api/banner",
     "/api/webhooks",
     "/api/auth",
@@ -59,7 +92,7 @@ export function proxy(request: NextRequest) {
 
   if (isPublic) {
     const response = NextResponse.next();
-    applySecurityHeaders(response, pathname);
+    applySecurityHeaders(response, pathname, request);
     return response;
   }
 
@@ -70,6 +103,7 @@ export function proxy(request: NextRequest) {
     "/dsars",
     "/assessments",
     "/data-map",
+    "/inventory",
     "/vendors",
     "/preferences",
     "/agents",
@@ -78,13 +112,7 @@ export function proxy(request: NextRequest) {
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtected) {
-    const sessionToken =
-      request.cookies.get("__Secure-next-auth.session-token") ??
-      request.cookies.get("next-auth.session-token") ??
-      request.cookies.get("authjs.session-token") ??
-      request.cookies.get("__Secure-authjs.session-token");
-
-    if (!sessionToken) {
+    if (!hasSessionCookie(request)) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
@@ -92,7 +120,7 @@ export function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  applySecurityHeaders(response, pathname);
+  applySecurityHeaders(response, pathname, request);
   return response;
 }
 

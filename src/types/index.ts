@@ -74,6 +74,20 @@ export interface ScanJobPayload {
   maxPages: number;
 }
 
+/** Data inventory PII scan job (connector introspection + sampling + classify) */
+export interface DataScanJobPayload {
+  scanRunId: string;
+  orgId: string;
+  integrationId: string;
+  provider: string;
+}
+
+/** Deletion executor job (DSAR or retention run) */
+export interface DeletionJobPayload {
+  runId: string;
+  orgId: string;
+}
+
 /** Scanner result for a single page */
 export interface PageScanResult {
   url: string;

@@ -92,6 +92,8 @@ describe("POST /api/auth/signup", () => {
     expect(response.status).toBe(201);
     expect(body.success).toBe(true);
     expect(body.userId).toBe("user-1");
+    expect(typeof body.canSignInNow).toBe("boolean");
+    expect(body.needsVerification).toBe(!body.canSignInNow);
   });
 
   it("should create a default organization for new users", async () => {
@@ -155,6 +157,7 @@ describe("POST /api/auth/signup", () => {
 
     expect(response.status).toBe(201);
     expect(body.needsVerification).toBe(true);
+    expect(body.canSignInNow).toBe(false);
     expect(db.user.create).not.toHaveBeenCalled();
     expect(db.organization.create).not.toHaveBeenCalled();
   });
@@ -192,10 +195,10 @@ describe("POST /api/auth/signup", () => {
     expect(response.status).toBe(400);
   });
 
-  it("should return 400 for password shorter than 8 characters", async () => {
+  it("should return 400 for password shorter than 12 characters", async () => {
     const req = makeRequest({
       email: "test@example.com",
-      password: "short",
+      password: "shortpw999",
       name: "Test User",
     });
 

@@ -13,18 +13,33 @@ import { checkRateLimit } from "./rate-limit";
 import { createLogger } from "./logger";
 
 const secLog = createLogger("auth:security");
+const authLog = createLogger("auth");
+
+const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const githubId = process.env.GITHUB_CLIENT_ID?.trim();
+const githubSecret = process.env.GITHUB_CLIENT_SECRET?.trim();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   adapter: PrismaAdapter(db) as any,
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    GitHub({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
+    ...(googleId && googleSecret
+      ? [
+          Google({
+            clientId: googleId,
+            clientSecret: googleSecret,
+          }),
+        ]
+      : []),
+    ...(githubId && githubSecret
+      ? [
+          GitHub({
+            clientId: githubId,
+            clientSecret: githubSecret,
+          }),
+        ]
+      : []),
     Credentials({
       name: "Email & Password",
       credentials: {
@@ -37,31 +52,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = (credentials.email as string).toLowerCase().trim();
         const password = credentials.password as string;
 
-        const rl = await checkRateLimit(`login:${email}`, 5, 15 * 60 * 1000);
-        if (!rl.ok) {
-          secLog.warn("Login rate limited", { email: "[redacted]", remaining: rl.remaining });
+        try {
+          // Generous limit so typo retries do not lock out long‑tenured accounts (prod-safe).
+          const rl = await checkRateLimit(`login:${email}`, 20, 15 * 60 * 1000);
+          if (!rl.ok) {
+            secLog.warn("Login rate limited", { email: "[redacted]", remaining: rl.remaining });
+            return null;
+          }
+
+          const user = await db.user.findUnique({ where: { email } });
+          if (!user?.passwordHash) {
+            secLog.warn("Login failed: user not found or no password");
+            return null;
+          }
+
+          const valid = await compare(password, user.passwordHash);
+          if (!valid) {
+            secLog.warn("Login failed: invalid password");
+            return null;
+          }
+
+          if (!user.emailVerifiedAt) {
+            secLog.warn("Login failed: email not verified");
+            return null;
+          }
+
+          secLog.info("Login successful");
+          return { id: user.id, email: user.email, name: user.name, image: user.image };
+        } catch (err) {
+          authLog.error("authorize() threw — returning failed login", err);
           return null;
         }
-
-        const user = await db.user.findUnique({ where: { email } });
-        if (!user?.passwordHash) {
-          secLog.warn("Login failed: user not found or no password");
-          return null;
-        }
-
-        const valid = await compare(password, user.passwordHash);
-        if (!valid) {
-          secLog.warn("Login failed: invalid password");
-          return null;
-        }
-
-        if (!user.emailVerifiedAt) {
-          secLog.warn("Login failed: email not verified");
-          return null;
-        }
-
-        secLog.info("Login successful");
-        return { id: user.id, email: user.email, name: user.name, image: user.image };
       },
     }),
   ],
@@ -79,6 +100,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         "/dsars",
         "/assessments",
         "/data-map",
+        "/inventory",
         "/vendors",
         "/preferences",
         "/agents",
@@ -92,16 +114,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
       }
-      if (trigger === "signIn" || trigger === "update" || !token.orgId) {
-        const membership = await db.orgMember.findFirst({
-          where: { userId: token.id as string },
-          include: { org: true },
-          orderBy: { createdAt: "asc" },
-        });
-        if (membership) {
-          token.orgId = membership.orgId;
-          token.orgRole = membership.role;
-          token.orgSlug = membership.org.slug;
+      const userId = token.id as string | undefined;
+      if (
+        userId &&
+        (trigger === "signIn" || trigger === "update" || !token.orgId)
+      ) {
+        try {
+          const membership = await db.orgMember.findFirst({
+            where: { userId },
+            include: { org: true },
+            orderBy: { createdAt: "asc" },
+          });
+          if (membership) {
+            token.orgId = membership.orgId;
+            token.orgRole = membership.role;
+            token.orgSlug = membership.org.slug;
+          }
+        } catch (err) {
+          // Do not fail sign-in after password check: issue a session without org claims;
+          // tRPC may still reject until DB is healthy, but cookies/session are not lost.
+          authLog.error("jwt orgMember lookup failed — continuing without org claims", err);
         }
       }
       return token;

@@ -5,6 +5,8 @@ import { createRouter, orgProcedure, publicProcedure } from "../trpc";
 import { computeDsarDueDate } from "@/lib/dsar-deadlines";
 import { getAI, getAIModel, redactForPrompt } from "@/lib/ai";
 import { checkPublicRateLimit } from "@/lib/public-rate-limit";
+import { enqueueDeletion } from "@/lib/queue";
+import { getConnectorV2 } from "@/lib/connectors-v2";
 
 export const dsarRouter = createRouter({
   /** List all DSARs for the org, with optional status filter */
@@ -300,6 +302,95 @@ Respond in JSON format:
       });
 
       return updated;
+    }),
+
+  /**
+   * Build deletion tasks across connected integrations and enqueue the unified Deletion Executor.
+   * Dry-run (default) only writes receipts with no external deletes. Live requires admin/owner + approved.
+   */
+  startDeletionExecution: orgProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        dryRun: z.boolean().default(true),
+        approved: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const dsar = await ctx.db.dsarRequest.findFirst({
+        where: { id: input.id, orgId: ctx.orgId },
+      });
+      if (!dsar) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "DSAR request not found" });
+      }
+      if (dsar.requestType !== "deletion") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Automated deletion execution is only available for deletion-type requests.",
+        });
+      }
+      if (!input.dryRun) {
+        if (ctx.orgRole !== "admin" && ctx.orgRole !== "owner") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Live deletion requires admin or owner." });
+        }
+        if (!input.approved) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Live deletion requires explicit approved: true after reviewing dry-run results.",
+          });
+        }
+      }
+
+      const run = await ctx.db.deletionExecutionRun.create({
+        data: {
+          orgId: ctx.orgId,
+          dsarRequestId: dsar.id,
+          dryRun: input.dryRun,
+          approved: Boolean(input.approved) && !input.dryRun,
+          status: "pending",
+          createdByUserId: ctx.userId,
+        },
+      });
+
+      const integrations = await ctx.db.integration.findMany({
+        where: { orgId: ctx.orgId, status: "connected", nangoConnectionId: { not: null } },
+      });
+
+      for (const integ of integrations) {
+        const connector = getConnectorV2(integ.provider);
+        if (!connector.capabilities.searchSubject || !integ.nangoConnectionId) continue;
+        const matches = await connector.searchSubject(
+          { connectionId: integ.nangoConnectionId },
+          { email: dsar.requesterEmail },
+        );
+        for (const m of matches) {
+          const idempotencyKey = `dsar:${dsar.id}:run:${run.id}:${integ.id}:${m.externalRecordId}`;
+          await ctx.db.deletionTask.create({
+            data: {
+              runId: run.id,
+              integrationId: integ.id,
+              idempotencyKey,
+              provider: integ.provider,
+              externalRecordId: m.externalRecordId,
+              subjectEmail: dsar.requesterEmail,
+              status: "pending",
+            },
+          });
+        }
+      }
+
+      await enqueueDeletion({ runId: run.id, orgId: ctx.orgId });
+
+      await ctx.db.dsarActivity.create({
+        data: {
+          requestId: dsar.id,
+          action: "deletion_enqueued",
+          details: { runId: run.id, dryRun: input.dryRun, integrations: integrations.length },
+          actor: ctx.userId,
+        },
+      });
+
+      return { runId: run.id };
     }),
 
   /** Mark a DSAR as fulfilled */

@@ -1,6 +1,6 @@
 # Custodia
 
-AI-powered privacy & compliance SaaS. Website scanner, cookie consent banners, privacy policy generation, DSAR automation.
+AI-powered privacy & compliance SaaS. Website scanner, cookie consent banners, privacy policy generation, DSAR automation, **Data Inventory** (catalogue + PII scans + unified deletion executor).
 
 **Production:** https://app.custodia-privacy.com
 
@@ -8,13 +8,35 @@ AI-powered privacy & compliance SaaS. Website scanner, cookie consent banners, p
 
 ## Development
 
+**Important:** All `npm` / Prisma commands must be run from **this repository’s root** (the folder that contains `package.json` and `prisma/schema.prisma`), not from the parent `dev` workspace.
+
 ```bash
+# Linux / macOS — from your clone:
+cd swarm-company/custodia
+
+# Windows PowerShell — example:
+# cd C:\path\to\dev\swarm-company\custodia
+
 npm install
 cp .env.example .env.local   # fill in secrets
 npm run dev                  # http://localhost:3000
 ```
 
+If you see *“Could not find Prisma schema”*, your shell is almost certainly still in `dev/` (or another folder). `cd` into `swarm-company/custodia` first, or pass an explicit schema path:
+
+```bash
+npx prisma migrate deploy --schema prisma/schema.prisma
+```
+
 Requires: Node 22+, PostgreSQL 16, Redis 7
+
+### Data Inventory (optional local stack)
+
+- **PII engine** (FastAPI): `docker compose up pii-engine` or `cd pii-engine && pip install -r requirements.txt && uvicorn main:app --port 8090`
+- **Workers** (BullMQ `data-scan` + `deletion` queues): `npm run inventory-worker` (same `REDIS_URL` / `DATABASE_URL` as the app)
+- Set in `.env.local`: `PII_ENGINE_URL`, `DELETION_RECEIPT_HMAC_SECRET` (see `.env.example`)
+
+Docker Compose includes `pii-engine` and `inventory-worker` services. Apply DB migrations before first use: `npx prisma migrate deploy` (or `db push` in dev).
 
 ---
 

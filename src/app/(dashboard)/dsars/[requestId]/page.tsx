@@ -42,6 +42,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
   request_fulfilled: "Request fulfilled",
   request_rejected: "Request rejected",
   portal_submission: "Portal submission",
+  deletion_enqueued: "Deletion run queued",
+  deletion_executed: "Automated deletion completed",
 };
 
 export default function DsarDetailPage() {
@@ -78,6 +80,14 @@ export default function DsarDetailPage() {
       void utils.dsar.get.invalidate({ id: requestId });
       void utils.dsar.list.invalidate();
       void utils.dsar.stats.invalidate();
+    },
+  });
+
+  const startDeletion = api.dsar.startDeletionExecution.useMutation({
+    onSuccess: () => {
+      void utils.dsar.get.invalidate({ id: requestId });
+      void utils.inventory.listReceipts.invalidate();
+      void utils.inventory.listDeletionRuns.invalidate();
     },
   });
 
@@ -251,6 +261,37 @@ export default function DsarDetailPage() {
                   {processAI.isPending ? "Processing…" : "Run AI Processing"}
                 </button>
 
+                {dsar.requestType === "deletion" && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={startDeletion.isPending}
+                      onClick={() => startDeletion.mutate({ id: dsar.id, dryRun: true })}
+                      className="rounded-lg border border-navy-200 bg-white px-3 py-2 text-xs font-medium text-navy-800 hover:bg-navy-50 disabled:opacity-50 dark:border-navy-800 dark:bg-slate-900 dark:text-navy-200 dark:hover:bg-navy-950/40"
+                    >
+                      {startDeletion.isPending ? "Queueing…" : "Preview deletion (dry run)"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={startDeletion.isPending}
+                      onClick={() => {
+                        if (
+                          typeof window !== "undefined" &&
+                          !window.confirm(
+                            "Execute LIVE deletion in connected CRM systems for this requester? This cannot be undone.",
+                          )
+                        ) {
+                          return;
+                        }
+                        startDeletion.mutate({ id: dsar.id, dryRun: false, approved: true });
+                      }}
+                      className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      Execute live deletion
+                    </button>
+                  </>
+                )}
+
                 <button
                   type="button"
                   disabled={fulfill.isPending}
@@ -291,6 +332,9 @@ export default function DsarDetailPage() {
 
               {processAI.error && (
                 <p className="text-xs text-red-600">{processAI.error.message}</p>
+              )}
+              {startDeletion.error && (
+                <p className="text-xs text-red-600">{startDeletion.error.message}</p>
               )}
             </div>
           )}

@@ -6,29 +6,19 @@
  * `NOAUTH Authentication required` errors on internal INFO commands. Pass
  * explicit host/port/password extracted from REDIS_URL instead.
  */
-import { Queue, type ConnectionOptions } from "bullmq";
-import type { ScanJobPayload, AgentJobPayload } from "@/types";
+import { Queue } from "bullmq";
+import type { ScanJobPayload, AgentJobPayload, DataScanJobPayload, DeletionJobPayload } from "@/types";
+import { parseRedisConnection } from "@/lib/redis-connection";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
-
-function parseRedisConnection(rawUrl: string): ConnectionOptions {
-  const u = new URL(rawUrl);
-  return {
-    host: u.hostname,
-    port: u.port ? Number(u.port) : 6379,
-    // URL.password is URL-encoded; decode so special chars in the password work.
-    password: u.password ? decodeURIComponent(u.password) : undefined,
-    username: u.username ? decodeURIComponent(u.username) : undefined,
-    // BullMQ requires this for its blocking clients.
-    maxRetriesPerRequest: null,
-  };
-}
 
 const connection = parseRedisConnection(REDIS_URL);
 
 const globalForQueue = globalThis as unknown as {
   scanQueue: Queue<ScanJobPayload> | undefined;
   agentQueue: Queue<AgentJobPayload> | undefined;
+  dataScanQueue: Queue<DataScanJobPayload> | undefined;
+  deletionQueue: Queue<DeletionJobPayload> | undefined;
 };
 
 export const scanQueue =
@@ -55,9 +45,35 @@ export const agentQueue =
     },
   });
 
+export const dataScanQueue =
+  globalForQueue.dataScanQueue ??
+  new Queue<DataScanJobPayload>("data-scan", {
+    connection,
+    defaultJobOptions: {
+      attempts: 2,
+      backoff: { type: "exponential", delay: 8000 },
+      removeOnComplete: { age: 86400 },
+      removeOnFail: { age: 604800 },
+    },
+  });
+
+export const deletionQueue =
+  globalForQueue.deletionQueue ??
+  new Queue<DeletionJobPayload>("deletion", {
+    connection,
+    defaultJobOptions: {
+      attempts: 2,
+      backoff: { type: "exponential", delay: 10000 },
+      removeOnComplete: { age: 86400 },
+      removeOnFail: { age: 604800 },
+    },
+  });
+
 if (process.env.NODE_ENV !== "production") {
   globalForQueue.scanQueue = scanQueue;
   globalForQueue.agentQueue = agentQueue;
+  globalForQueue.dataScanQueue = dataScanQueue;
+  globalForQueue.deletionQueue = deletionQueue;
 }
 
 export async function enqueueScan(payload: ScanJobPayload): Promise<string> {
@@ -69,5 +85,15 @@ export async function enqueueScan(payload: ScanJobPayload): Promise<string> {
 
 export async function enqueueAgent(payload: AgentJobPayload): Promise<string> {
   const job = await agentQueue.add(`agent:${payload.agentType}`, payload);
+  return job.id!;
+}
+
+export async function enqueueDataScan(payload: DataScanJobPayload): Promise<string> {
+  const job = await dataScanQueue.add(`data-scan:${payload.provider}:${payload.scanRunId}`, payload);
+  return job.id!;
+}
+
+export async function enqueueDeletion(payload: DeletionJobPayload): Promise<string> {
+  const job = await deletionQueue.add(`deletion:${payload.runId}`, payload);
   return job.id!;
 }

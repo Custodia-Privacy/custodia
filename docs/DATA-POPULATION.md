@@ -2,6 +2,29 @@
 
 Dashboard screens read from **PostgreSQL** via **tRPC**. Main list/detail pages use real rows; a few **UI-only** elements remain (e.g. decorative “fake page” blocks inside the banner preview frame).
 
+## Local test login (script — dev only)
+
+For a **verified** email/password account (so `/login` works without Resend), plus optional **demo Inventory** data (assets, a completed scan, sample PII findings, and a disconnected HubSpot integration row):
+
+```bash
+cd swarm-company/custodia
+npm run db:create-local-test-user
+```
+
+Defaults:
+
+| | |
+|--|--|
+| **Email** | `local-test@custodia.dev` |
+| **Password** | `LocalTest-Custodia-2026!` |
+
+- Safe to re-run: it refreshes the password hash and `emailVerifiedAt`.
+- Demo inventory seed is **on** by default. To create **only** the user/org: `SEED_DEMO_INVENTORY=0 npm run db:create-local-test-user`
+
+Then start the app (`npm run dev`), open `/login`, and browse **Inventory**, **Findings**, etc. Live connector scans still need Nango + `inventory-worker` + PII engine.
+
+---
+
 ## Paths to data
 
 | Path | What it creates |
