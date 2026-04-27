@@ -84,7 +84,7 @@ export default function SignupPage() {
       }
 
       const trimmedEmail = email.trim().toLowerCase();
-      let signInRes;
+      let signInRes: Awaited<ReturnType<typeof signIn>> | undefined;
       try {
         signInRes = await signIn("credentials", {
           email: trimmedEmail,
@@ -93,13 +93,26 @@ export default function SignupPage() {
           callbackUrl: "/dashboard",
         });
       } catch {
-        setError("Account created but auto-login failed. Please log in manually.");
+        setError(
+          "Account was created, but auto-login hit a browser or network error. Open the Log in page and sign in with the same password.",
+        );
         setLoading(false);
         return;
       }
 
       if (signInRes === undefined || signInRes.error) {
-        setError("Account created but auto-login failed. Please log in manually.");
+        const err = signInRes?.error;
+        if (err === "CredentialsSignin") {
+          setError(
+            "Account was created, but sign-in was rejected (often: email not verified yet, or you need to wait a few seconds and try Log in). If you were asked to verify your email, use the link in your inbox first.",
+          );
+        } else if (err) {
+          setError(`Account was created, but auto-login failed (${err}). Please use Log in.`);
+        } else {
+          setError(
+            "Account was created, but auto-login did not finish. Please use Log in with the same password.",
+          );
+        }
         setLoading(false);
         return;
       }

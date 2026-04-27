@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+/** Do not statically cache auth HTML at the CDN — keeps security headers current. */
+export const dynamic = "force-dynamic";
+
 /**
  * Auth layout — centered card layout for login/signup pages.
  */

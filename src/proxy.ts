@@ -68,8 +68,8 @@ function applySecurityHeaders(
     response.headers.set("X-Frame-Options", "DENY");
     response.headers.set(
       "Content-Security-Policy",
-      // Plausible (root layout) — allow script + beacon to plausible.io
-      "default-src 'self'; script-src 'self' 'unsafe-inline' https://plausible.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: https://plausible.io; frame-ancestors 'none';",
+      // Plausible (root layout) + Cloudflare Web Analytics (often injected at the edge)
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://plausible.io https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: https://plausible.io https://cloudflareinsights.com; frame-ancestors 'none';",
     );
   }
 }
@@ -99,6 +99,18 @@ export function proxy(request: NextRequest) {
   if (isPublic) {
     const response = NextResponse.next();
     applySecurityHeaders(response, pathname, request);
+    // Avoid caching HTML + security headers at the edge for a year (was breaking CSP
+    // updates and confusing debugging). Auth pages must always get fresh headers.
+    if (
+      pathname === "/login" ||
+      pathname === "/signup" ||
+      pathname === "/forgot-password"
+    ) {
+      response.headers.set(
+        "Cache-Control",
+        "private, no-store, max-age=0, must-revalidate",
+      );
+    }
     return response;
   }
 
