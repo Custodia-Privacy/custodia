@@ -17,6 +17,7 @@
     "db:studio": "prisma studio --schema prisma/schema.prisma",
     "db:seed": "prisma db seed --schema prisma/schema.prisma",
     "db:create-local-test-user": "tsx scripts/create-local-test-user.ts",
+    "cloudflare:apply-csp": "node scripts/apply-cloudflare-csp.mjs",
     "inventory-worker": "tsx src/workers/inventory-workers.ts",
     "scanner:dev": "tsx watch scanner/src/index.ts",
     "scanner:build": "tsup scanner/src/index.ts --format esm --out-dir scanner/dist --external playwright --external chromium-bidi",
