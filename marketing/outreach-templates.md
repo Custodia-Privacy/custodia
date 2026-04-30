@@ -93,7 +93,7 @@ Technical details:
 
 Free scan (no signup): https://app.custodia-privacy.com/scan
 
-Pricing: $29/mo for 1 site, $79/mo for 3, $149/mo for 10.
+Pricing: $29/mo for 1 site, $79/mo for 5, $149/mo for 25.
 
 We're particularly interested in feedback on the scanner accuracy and the MCP server approach — we designed Custodia to be agent-first, where AI agents can manage compliance programmatically via the MCP protocol.
 
@@ -119,8 +119,8 @@ I kept running into the same problem: small businesses that needed GDPR/CCPA com
 **Business model:**
 - Free: website scan (lead gen)
 - $29/mo: 1 site, full compliance stack
-- $79/mo: 3 sites + DSARs + PIAs
-- $149/mo: 10 sites + data governance + API
+- $79/mo: 5 sites + DSARs + data inventory
+- $149/mo: 25 sites + data governance + API
 
 **Current status:**
 Launched today. Product is live. Looking for early users and feedback.
